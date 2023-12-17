@@ -36,6 +36,8 @@ pkgs.dockerTools.buildLayeredImage {
     pkgs.nginx
     pkgs.bash
     pkgs.coreutils
+    pkgs.procps
+    pkgs.iputils
     (pkgs.writeScriptBin "start-server" ''
       #!${pkgs.runtimeShell}
       nginx -c ${nginxConf};
