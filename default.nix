@@ -47,21 +47,21 @@ let
     };
 in
 rec {
-  alpha = mkNetbuild {
+  aleph = mkNetbuild {
     mac = "48-4d-7e-ee-44-9b";
-    configuration = ./alpha.nix;
+    configuration = ./aleph.nix;
   };
-  beta = mkNetbuild {
+  bet = mkNetbuild {
     mac = "48-4d-7e-ee-4d-09";
-    configuration = ./beta.nix;
+    configuration = ./bet.nix;
   };
-  gamma = mkNetbuild {
+  gimel = mkNetbuild {
     mac = "18-66-da-47-97-93";
-    configuration = ./gamma.nix;
+    configuration = ./gimel.nix;
   };
-  delta = mkNetbuild {
+  dalet = mkNetbuild {
     mac = "48-4d-7e-ee-48-0d";
-    configuration = ./delta.nix;
+    configuration = ./dalet.nix;
   };
 
   nginxIpxe = import ./nginx.nix
