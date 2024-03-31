@@ -1,6 +1,4 @@
-{ pkgs
-, config
-}:
+{ pkgs, config, qemu, ganeti }:
 
 {
   console.keyMap = "us";
@@ -138,7 +136,7 @@
       git
       ethtool
       iperf3
-      telnet
+      inetutils
       netcat
       drbd
       qemu
