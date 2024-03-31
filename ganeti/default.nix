@@ -1,3 +1,3 @@
 { pkgs }:
 
-pkgs.callPackage ./ganeti/ganeti.nix { }
+pkgs.callPackage ./ganeti.nix { }
