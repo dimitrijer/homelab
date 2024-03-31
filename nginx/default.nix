@@ -30,6 +30,7 @@ in
 pkgs.dockerTools.buildLayeredImage {
   name = "nginx";
   tag = "latest";
+  maxLayers = 2;
 
   contents = [
     pkgs.fakeNss
@@ -40,7 +41,7 @@ pkgs.dockerTools.buildLayeredImage {
     pkgs.iputils
     (pkgs.writeScriptBin "start-server" ''
       #!${pkgs.runtimeShell}
-      nginx -c ${nginxConf};
+      nginx -c ${nginxConf}
     '')
   ];
 

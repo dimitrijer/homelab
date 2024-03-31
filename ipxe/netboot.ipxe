@@ -1,0 +1,50 @@
+#!ipxe
+
+set boot-url http://10.1.100.1
+
+set menu-timeout 5000
+set menu-default netboot
+
+:start
+menu iPXE boot menu for ${initiator-iqn}
+item --gap --             ------------------------- Operating systems ------------------------------
+item --key n netboot      Boot NixOS netboot (Legacy BIOS / EFI)
+item --key f freedos      Boot FreeDOS (Legacy BIOS)
+item --key w windows10    Boot Windows 10 installer media (EFI)
+item --gap --             ------------------------- Advanced options -------------------------------
+item shell                Drop to iPXE shell
+item reboot               Reboot computer
+choose --timeout ${menu-timeout} --default ${menu-default} selected || goto failed
+goto ${selected}
+
+:freedos
+echo Booting FreeDOS...
+sanhook ${boot-url}/freedos/payload.img
+kernel ${boot-url}/freedos/memdisk raw
+initrd ${boot-url}/freedos/FD13.img
+boot || goto failed
+
+:windows10
+echo Booting Windows 10 x64 installation media...
+kernel ${boot-url}/win/wimboot gui
+initrd ${boot-url}/win/winpeshl.ini winpeshl.ini
+initrd ${boot-url}/win/install.bat  install.bat
+initrd ${boot-url}/win/bcd          BCD
+initrd ${boot-url}/win/boot.sdi     boot.sdi
+initrd ${boot-url}/win/boot.wim     boot.wim
+boot
+
+:netboot
+echo Booting netboot...
+chain --replace --autofree ${boot-url}/nixos/mac/${mac:hexhyp}/ipxe || goto failed
+
+:shell
+shell
+
+:reboot
+echo Rebooting...
+reboot
+
+:failed
+echo PXE boot failed, dropping to shell
+goto shell

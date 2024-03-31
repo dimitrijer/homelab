@@ -1,26 +1,38 @@
 {
+    "disko": {
+        "branch": "master",
+        "description": "Format disks with nix-config [maintainer=@Lassulus]",
+        "homepage": "",
+        "owner": "nix-community",
+        "repo": "disko",
+        "rev": "502241afa3de2a24865ddcbe4c122f4546e32092",
+        "sha256": "0bm2x8zc81vnc4vcqwci0h9s21i8sw93mhsaznf0x70mhhg7j45w",
+        "type": "tarball",
+        "url": "https://github.com/nix-community/disko/archive/502241afa3de2a24865ddcbe4c122f4546e32092.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
     "nixfiles": {
         "branch": "main",
         "description": "My nixfiles",
         "homepage": null,
         "owner": "dimitrijer",
         "repo": "nixfiles",
-        "rev": "f3b533467a5b8e16cd153ced52790932abbfaaff",
-        "sha256": "1h23apzfjjm4zn50d6wq4cl40zzq6zihmb2lg5bl05zlr9xmhf9f",
+        "rev": "17269e02c9db0cb7f2b533c9d7f4aca6850a56da",
+        "sha256": "0dkm8861fqp1n8rc3m2pab7p727lqmy83sbik8i2b5k0nw4q5nia",
         "type": "tarball",
-        "url": "https://github.com/dimitrijer/nixfiles/archive/f3b533467a5b8e16cd153ced52790932abbfaaff.tar.gz",
+        "url": "https://github.com/dimitrijer/nixfiles/archive/17269e02c9db0cb7f2b533c9d7f4aca6850a56da.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixpkgs": {
-        "branch": "nixos-23.11",
+        "branch": "21.11",
         "description": "Nix Packages collection",
         "homepage": null,
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "933d7dc155096e7575d207be6fb7792bc9f34f6d",
-        "sha256": "1gcqpm7v42wfmq0wrl4dym9kg4y7n4f5wsgvisq52zr90vjvylwx",
+        "rev": "a7ecde854aee5c4c7cd6177f54a99d2c1ff28a31",
+        "sha256": "162dywda2dvfj1248afxc45kcrg83appjd0nmdb541hl7rnncf02",
         "type": "tarball",
-        "url": "https://github.com/NixOS/nixpkgs/archive/933d7dc155096e7575d207be6fb7792bc9f34f6d.tar.gz",
+        "url": "https://github.com/NixOS/nixpkgs/archive/a7ecde854aee5c4c7cd6177f54a99d2c1ff28a31.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }

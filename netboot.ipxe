@@ -1,2 +1,0 @@
-#!ipxe
-chain --replace --autofree http://10.1.100.1/mac/${mac:hexhyp}/ipxe

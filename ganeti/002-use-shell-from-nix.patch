@@ -1,0 +1,14 @@
+diff --git a/Makefile.am b/Makefile.am
+index aa92d2e30..8c096bb32 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -23,9 +23,6 @@ comma := ,
+ # Helper function to strip src/ and test/hs/ from a list
+ strip_hsroot = $(patsubst src/%,%,$(patsubst test/hs/%,%,$(1)))
+ 
+-# Use bash in order to be able to use pipefail
+-SHELL=/bin/bash
+-
+ EXTRA_DIST=
+ 
+ # Enable colors in shelltest
