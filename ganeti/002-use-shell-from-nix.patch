@@ -1,5 +1,5 @@
 diff --git a/Makefile.am b/Makefile.am
-index aa92d2e30..8c096bb32 100644
+index aa92d2e30..c93757c2b 100644
 --- a/Makefile.am
 +++ b/Makefile.am
 @@ -23,9 +23,6 @@ comma := ,
@@ -12,3 +12,13 @@ index aa92d2e30..8c096bb32 100644
  EXTRA_DIST=
  
  # Enable colors in shelltest
+@@ -2849,9 +2846,6 @@ dist-release: dist
+ 	done
+ 
+ install-exec-local:
+-	@mkdir_p@ "$(DESTDIR)${localstatedir}/lib/ganeti" \
+-	  "$(DESTDIR)${localstatedir}/log/ganeti" \
+-	  "$(DESTDIR)${localstatedir}/run/ganeti"
+ 	for dir in $(SYMLINK_TARGET_DIRS); do \
+ 	  @mkdir_p@  $(DESTDIR)$$dir; \
+ 	done

@@ -108,7 +108,7 @@ stdenv.mkDerivation
     ./configure \
       --prefix=$out \
       --libdir=$out/lib \
-      --localstatedir=$out/var \
+      --localstatedir=/var \
       --sysconfdir=$out/etc \
       --enable-symlinks \
       --with-sshd-restart-command="systemctl restart sshd.service" \

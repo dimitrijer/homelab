@@ -1,6 +1,6 @@
 #!ipxe
 
-set boot-url http://10.1.100.1
+set boot-url http://10.1.100.4
 
 set menu-timeout 5000
 set menu-default netboot
@@ -36,7 +36,7 @@ boot
 
 :netboot
 echo Booting netboot...
-chain --replace --autofree ${boot-url}/nixos/mac/${mac:hexhyp}/ipxe || goto failed
+chain --replace --autofree ${boot-url}/nixos/by-mac/${mac:hexhyp}/ipxe || goto failed
 
 :shell
 shell
