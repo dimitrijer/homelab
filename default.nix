@@ -3,15 +3,23 @@
 let
   sources = import ./nix/sources.nix;
   disko = sources.disko;
-  nixpkgs-latest = import sources.nixpkgs-23-11 { };
   ganeti = import ./ganeti/default.nix { inherit pkgs; };
+  qemu = pkgs.qemu;
+  nixpkgs-latest = import sources.nixpkgs-23-11 {
+    overlays = [
+      (self: (super:
+        super // {
+          inherit ganeti qemu;
+        }
+      ))
+    ];
+  };
   hosts = import ./nixos/default.nix {
-    inherit ganeti disko;
-    qemu = pkgs.qemu;
     pkgs = nixpkgs-latest;
+    inherit disko;
   };
 in
 {
-  inherit ganeti;
+  inherit ganeti qemu;
   nginx = import ./nginx/default.nix { pkgs = pkgs.pkgsCross.aarch64-multiplatform; };
 } // hosts

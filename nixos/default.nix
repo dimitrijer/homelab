@@ -1,4 +1,4 @@
-{ pkgs, disko, qemu, ganeti }:
+{ pkgs, disko }:
 
 let
   dest = "10.1.100.1";
@@ -9,20 +9,17 @@ let
       sys =
         pkgs.nixos
           ({ config, pkgs, lib, modulesPath, ... }:
-            let
-              common-config = import ./common.nix { inherit pkgs config qemu ganeti; };
-              host-config = configuration { inherit pkgs config; };
-            in
             {
               imports = [
                 (modulesPath + "/installer/netboot/netboot.nix")
+                (modulesPath + "/profiles/minimal.nix")
+                ("${disko}/module.nix")
+                ./common.nix
+                configuration
                 # Allow "nixos-rebuild" to work properly by providing
                 # /etc/nixos/configuration.nix.
                 (modulesPath + "/profiles/clone-config.nix")
-                (modulesPath + "/profiles/minimal.nix")
-                ("${disko}/module.nix")
               ];
-              config = common-config // host-config;
             });
 
       build = sys.config.system.build;
@@ -57,18 +54,18 @@ in
 {
   aleph = mkNetbuild {
     mac = "48-4d-7e-ee-44-9b";
-    configuration = import ./hosts/aleph.nix;
+    configuration = ./hosts/aleph.nix;
   };
   bet = mkNetbuild {
     mac = "48-4d-7e-ee-4d-09";
-    configuration = import ./hosts/bet.nix;
+    configuration = ./hosts/bet.nix;
   };
   gimel = mkNetbuild {
     mac = "18-66-da-47-97-93";
-    configuration = import ./hosts/gimel.nix;
+    configuration = ./hosts/gimel.nix;
   };
   dalet = mkNetbuild {
     mac = "48-4d-7e-ee-48-0d";
-    configuration = import ./hosts/dalet.nix;
+    configuration = ./hosts/dalet.nix;
   };
 }
