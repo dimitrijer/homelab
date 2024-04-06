@@ -1,3 +1,1 @@
-{
-  networking.hostName = "dalet";
-}
+{ }

@@ -1,0 +1,24 @@
+diff --git a/common.sh b/common.sh
+index ec3bdbb..9fb0a44 100644
+--- a/common.sh
++++ b/common.sh
+@@ -156,17 +156,8 @@ CACHE_DIR="/var/cache/ganeti-instance-debootstrap"
+ 
+ SCRIPT_NAME=$(basename $0)
+ 
+-if [ -f /sbin/blkid -a -x /sbin/blkid ]; then
+-  VOL_ID="/sbin/blkid -o value -s UUID"
+-  VOL_TYPE="/sbin/blkid -o value -s TYPE"
+-else
+-  for dir in /lib/udev /sbin; do
+-    if [ -f $dir/vol_id -a -x $dir/vol_id ]; then
+-      VOL_ID="$dir/vol_id -u"
+-      VOL_TYPE="$dir/vol_id -t"
+-    fi
+-  done
+-fi
++VOL_ID="blkid -o value -s UUID"
++VOL_TYPE="blkid -o value -s TYPE"
+ 
+ if [ -z "$VOL_ID" ]; then
+   log_error "vol_id or blkid not found, please install udev or util-linux"

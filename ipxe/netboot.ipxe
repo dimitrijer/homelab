@@ -9,6 +9,7 @@ set menu-default netboot
 menu iPXE boot menu for ${initiator-iqn}
 item --gap --             ------------------------- Operating systems ------------------------------
 item --key n netboot      Boot NixOS netboot (Legacy BIOS / EFI)
+item --key w arch         Boot Arch Linux installer (Legacy BIOS)
 item --key f freedos      Boot FreeDOS (Legacy BIOS)
 item --key w windows10    Boot Windows 10 installer media (EFI)
 item --gap --             ------------------------- Advanced options -------------------------------
@@ -16,6 +17,10 @@ item shell                Drop to iPXE shell
 item reboot               Reboot computer
 choose --timeout ${menu-timeout} --default ${menu-default} selected || goto failed
 goto ${selected}
+
+:arch
+echo Booting Arch...
+chain --replace --autofree ${boot-url}/arch/ipxe || goto failed
 
 :freedos
 echo Booting FreeDOS...

@@ -1,5 +1,5 @@
 diff --git a/Makefile.am b/Makefile.am
-index aa92d2e30..c93757c2b 100644
+index aa92d2e30..769813cce 100644
 --- a/Makefile.am
 +++ b/Makefile.am
 @@ -23,9 +23,6 @@ comma := ,
@@ -22,3 +22,12 @@ index aa92d2e30..c93757c2b 100644
  	for dir in $(SYMLINK_TARGET_DIRS); do \
  	  @mkdir_p@  $(DESTDIR)$$dir; \
  	done
+@@ -3056,7 +3050,7 @@ ganeti.cabal: cabal/ganeti.template.cabal Makefile cabal/cabal-from-modules.py $
+ # Target that builds all binaries (including those that are not
+ # rebuilt except when running the tests)
+ .PHONY: really-all
+-really-all: all $(check_SCRIPTS) $(haskell_tests) $(HS_ALL_PROGS)
++really-all: all $(HS_ALL_PROGS) $(BUILT_EXAMPLES)
+ 
+ # we don't need the ancient implicit rules:
+ %: %,v
