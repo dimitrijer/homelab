@@ -1,3 +1,58 @@
+diff --git a/test/py/ganeti.hooks_unittest.py b/test/py/ganeti.hooks_unittest.py
+index 6e4ebcacd..bcc8df99c 100755
+--- a/test/py/ganeti.hooks_unittest.py
++++ b/test/py/ganeti.hooks_unittest.py
+@@ -139,15 +139,6 @@ class TestHooksRunner(unittest.TestCase):
+       self.assertEqual(self.hr.RunHooks(self.hpath, phase, {}),
+                            [(self._rname(fname), HKR_SUCCESS, "")])
+ 
+-  def testSymlink(self):
+-    """Test running a symlink"""
+-    for phase in (constants.HOOKS_PHASE_PRE, constants.HOOKS_PHASE_POST):
+-      fname = "%s/success" % self.ph_dirs[phase]
+-      os.symlink("/bin/true", fname)
+-      self.torm.append((fname, False))
+-      self.assertEqual(self.hr.RunHooks(self.hpath, phase, {}),
+-                           [(self._rname(fname), HKR_SUCCESS, "")])
+-
+   def testFail(self):
+     """Test success execution"""
+     for phase in (constants.HOOKS_PHASE_PRE, constants.HOOKS_PHASE_POST):
+@@ -177,34 +168,6 @@ class TestHooksRunner(unittest.TestCase):
+         expect.append((self._rname(fname), rs, ""))
+       self.assertEqual(self.hr.RunHooks(self.hpath, phase, {}), expect)
+ 
+-  def testOrdering(self):
+-    for phase in (constants.HOOKS_PHASE_PRE, constants.HOOKS_PHASE_POST):
+-      expect = []
+-      for fbase in ["10s1",
+-                    "00s0",
+-                    "10sa",
+-                    "80sc",
+-                    "60sd",
+-                    ]:
+-        fname = "%s/%s" % (self.ph_dirs[phase], fbase)
+-        os.symlink("/bin/true", fname)
+-        self.torm.append((fname, False))
+-        expect.append((self._rname(fname), HKR_SUCCESS, ""))
+-      expect.sort()
+-      self.assertEqual(self.hr.RunHooks(self.hpath, phase, {}), expect)
+-
+-  def testEnv(self):
+-    """Test environment execution"""
+-    for phase in (constants.HOOKS_PHASE_PRE, constants.HOOKS_PHASE_POST):
+-      fbase = "success"
+-      fname = "%s/%s" % (self.ph_dirs[phase], fbase)
+-      os.symlink("/usr/bin/env", fname)
+-      self.torm.append((fname, False))
+-      env_snt = {"PHASE": phase}
+-      env_exp = "PHASE=%s" % phase
+-      self.assertEqual(self.hr.RunHooks(self.hpath, phase, env_snt),
+-                           [(self._rname(fname), HKR_SUCCESS, env_exp)])
+-
+ 
+ def FakeHooksRpcSuccess(node_list, hpath, phase, env):
+   """Fake call_hooks_runner function.
 diff --git a/test/py/ganeti.hypervisor.hv_kvm_unittest.py b/test/py/ganeti.hypervisor.hv_kvm_unittest.py
 index 4e051215c..68cb46b78 100755
 --- a/test/py/ganeti.hypervisor.hv_kvm_unittest.py

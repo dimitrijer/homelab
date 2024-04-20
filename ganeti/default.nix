@@ -267,33 +267,31 @@ rec {
         (daemons ++ htools ++ pythonBinaries ++ tools));
 
   installPhase = ''
-    make
-    install
-    install - d - m 755 $out/rc.d/init.d
-    install - d - m 755 $out/etc/bash_completion.d
-    install - d - m 755 $out/etc/cron.d
-    install - d - m 755 $out/etc/default
-    install - d - m 755 $out/etc/logrotate.d
-    install - d - m 755 $out/etc/sysconfig
+    make install
+    install -d -m 755 $out/etc/bash_completion.d
+    install -d -m 755 $out/etc/cron.d
+    install -d -m 755 $out/etc/default
+    install -d -m 755 $out/etc/logrotate.d
+    install -d -m 755 $out/lib/systemd/system
 
-    install - m 644 doc/examples/bash_completion-debug $out/etc/bash_completion.d/ganeti
-    install - m 644 doc/examples/ganeti.cron $out/etc/cron.d/ganeti
-    install - m 644 doc/examples/ganeti.default $out/etc/default/ganeti
+    install -m 644 doc/examples/bash_completion $out/etc/bash_completion.d/ganeti
+    install -m 644 doc/examples/ganeti.cron $out/etc/cron.d/ganeti
+    install -m 644 doc/examples/ganeti.default $out/etc/default/ganeti
+    install -m 644 doc/examples/ganeti.logrotate $out/etc/logrotate.d/ganeti
 
-    install - d - m 755 $out/lib/systemd/system
-    install - m 644 doc/examples/systemd/ganeti-common.service $out/lib/systemd/system/ganeti-common.service
-    install - m 644 doc/examples/systemd/ganeti-confd.service  $out/lib/systemd/system/ganeti-confd.service
-    install - m 644 doc/examples/systemd/ganeti-kvmd.service   $out/lib/systemd/system/ganeti-kvmd.service
-    install - m 644 doc/examples/systemd/ganeti-luxid.service  $out/lib/systemd/system/ganeti-luxid.service
-    install - m 644 doc/examples/systemd/ganeti-metad.service  $out/lib/systemd/system/ganeti-metad.service
-    install - m 644 doc/examples/systemd/ganeti-mond.service   $out/lib/systemd/system/ganeti-mond.service
-    install - m 644 doc/examples/systemd/ganeti-noded.service  $out/lib/systemd/system/ganeti-noded.service
-    install - m 644 doc/examples/systemd/ganeti-rapi.service   $out/lib/systemd/system/ganeti-rapi.service
-    install - m 644 doc/examples/systemd/ganeti-wconfd.service $out/lib/systemd/system/ganeti-wconfd.service
+    install -m 644 doc/examples/systemd/ganeti-common.service $out/lib/systemd/system/ganeti-common.service
+    install -m 644 doc/examples/systemd/ganeti-confd.service  $out/lib/systemd/system/ganeti-confd.service
+    install -m 644 doc/examples/systemd/ganeti-kvmd.service   $out/lib/systemd/system/ganeti-kvmd.service
+    install -m 644 doc/examples/systemd/ganeti-luxid.service  $out/lib/systemd/system/ganeti-luxid.service
+    install -m 644 doc/examples/systemd/ganeti-metad.service  $out/lib/systemd/system/ganeti-metad.service
+    install -m 644 doc/examples/systemd/ganeti-mond.service   $out/lib/systemd/system/ganeti-mond.service
+    install -m 644 doc/examples/systemd/ganeti-noded.service  $out/lib/systemd/system/ganeti-noded.service
+    install -m 644 doc/examples/systemd/ganeti-rapi.service   $out/lib/systemd/system/ganeti-rapi.service
+    install -m 644 doc/examples/systemd/ganeti-wconfd.service $out/lib/systemd/system/ganeti-wconfd.service
 
-    install - m 644 doc/examples/systemd/ganeti-master.target  $out/lib/systemd/system/ganeti-master.target
-    install - m 644 doc/examples/systemd/ganeti-node.target    $out/lib/systemd/system/ganeti-node.target
-    install - m 644 doc/examples/systemd/ganeti.service        $out/lib/systemd/system/ganeti.service
-    install - m 644 doc/examples/systemd/ganeti.target         $out/lib/systemd/system/ganeti.target
+    install -m 644 doc/examples/systemd/ganeti-master.target  $out/lib/systemd/system/ganeti-master.target
+    install -m 644 doc/examples/systemd/ganeti-node.target    $out/lib/systemd/system/ganeti-node.target
+    install -m 644 doc/examples/systemd/ganeti.service        $out/lib/systemd/system/ganeti.service
+    install -m 644 doc/examples/systemd/ganeti.target         $out/lib/systemd/system/ganeti.target
   '';
 }
