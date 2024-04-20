@@ -10,9 +10,9 @@ self: super: {
     ncursesSupport = false;
     usbredirSupport = false;
     hostCpuTargets = [ "x86_64-softmmu" ];
-    # when using newer qemu, disable these
-    #pipewireSupport = false
-    #jackSupport = false
+    # when using newer qemu, disable these as well
+    # pipewireSupport = false
+    # jackSupport = false
   };
 
   ghc = super.haskell.packages.ghc884;

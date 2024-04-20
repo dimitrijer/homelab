@@ -1,32 +1,29 @@
-{ pkgs ? import ./nix/default.nix { } }:
+{}:
 
 let
+  pkgs = import ./nix/default.nix { };
   sources = import ./nix/sources.nix;
-  # drbd-utils 8.4 is broken on linux kernels 5+
-  # Luckily, drbd-utils 9.19 supports drbd kernel module 8.4
-  disko = sources.disko;
-  ganeti = import ./ganeti/default.nix {
-    inherit pkgs;
+  ganeti = pkgs.callPackage ./ganeti/default.nix {
+    # drbd-utils 8.4 is broken on linux kernels 5+
+    # Luckily, drbd-utils 9.19 supports drbd kernel module 8.4
     drbd = (import sources.nixpkgs-23-11 { }).drbd;
   };
+  ganeti-os-providers = import ./ganeti/os-providers/default.nix { inherit pkgs; };
   qemu = pkgs.qemu;
-  nixpkgs-latest = import sources.nixpkgs-23-11 {
+  pkgs-23-11 = import sources.nixpkgs-23-11 {
     overlays = [
       (self: (super:
         super // {
-          inherit (ganeti) ganeti ganeti-os-pxe;
-          inherit qemu;
-        }
+          inherit ganeti qemu;
+        } // ganeti-os-providers
       ))
     ];
   };
-  hosts = import ./nixos/default.nix {
-    pkgs = nixpkgs-latest;
-    inherit disko;
+  netbuildClasses = import ./nixos/default.nix {
+    pkgs = pkgs-23-11;
+    disko = sources.disko;
   };
 in
 {
-  inherit (ganeti) ganeti ganeti-os-pxe;
-  inherit qemu;
-  nginx = import ./nginx/default.nix { pkgs = pkgs.pkgsCross.aarch64-multiplatform; };
-} // hosts
+  nginx = import ./nginx/default.nix { pkgs = pkgs-23-11.pkgsCross.aarch64-multiplatform; };
+} // netbuildClasses
