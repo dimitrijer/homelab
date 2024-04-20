@@ -94,7 +94,7 @@ in
             {
               from = 7788;
               to = 65535;
-            } # for drbd traffic
+            } # for drbd traffic and VNC console access
           ];
         };
         enableIPv6 = false;
@@ -128,6 +128,7 @@ in
       services.openssh = {
         enable = true;
         hostKeys = lib.mkForce [ ];
+        settings.PermitRootLogin = "yes";
       };
 
       users.users.root.openssh.authorizedKeys.keys = lib.attrsets.mapAttrsToList
