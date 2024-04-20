@@ -3,26 +3,27 @@
 , fetchurl
 , autoreconfHook
 , makeWrapper
-, man
+, breakpointHook
+, ghc
+, python3
 , coreutils
 , util-linux
 , procps
+, iproute
+, socat
+, iputils
+, fping
+, ndisc6 # for IPv6
+, curl # needed for headers only
+, fakeroot
 , systemd
 , multipath-tools
 , openvswitch
 , gnutar
 , lvm2
-, fakeroot
-, iproute
-, iputils
-, fping
-, ndisc6 # for IPv6
-, curl # needed for headers only
-, socat
 , openssh
 , drbd
-, ghc
-, python3
+, man
 , pandoc
 , graphviz
 , qemu-utils # for ovfimport
@@ -85,7 +86,7 @@ let
     ]);
 in
 stdenv.mkDerivation
-{
+rec {
   pname = "ganeti";
   version = "3.0.2";
   src = fetchurl {
@@ -95,18 +96,44 @@ stdenv.mkDerivation
 
   nativeBuildInputs = [
     autoreconfHook
+    breakpointHook
     makeWrapper
+    fakeroot # for tests requiring fakeroot
+    coreutils
+  ];
+
+  nativeCheckInputs = [
+    fakeroot
+    openssh
+    procps
+    coreutils
+  ];
+
+  propagatedBuildInputs = [
+    iproute
+    socat
+    qemu-utils
+    coreutils
+    util-linux
+    procps
+    systemd
+    gnutar
+    lvm2
+    iproute
+    iputils
+    fping
+    ndisc6
+    openssh
+    openvswitch
+    multipath-tools
+    systemd
+    drbd
   ];
 
   buildInputs = [
-    fakeroot # for unit tests that require root
     curl
-    iproute
-    iputils
-    socat
     pythonWithPackages
     ghcWithPackages
-    qemu-utils
     pandoc # for man pages
     man # for man pages
   ]
@@ -128,6 +155,7 @@ stdenv.mkDerivation
     ./ganeti-3.0.2-make-daemons-scripts-executable.patch
     ./ganeti-3.0.2-makefile-am.patch
     ./ganeti-3.0.2-do-not-link-when-running-ssh-cmds.patch
+    ./ganeti-3.0.2-disable-incompatible-pytests.patch
   ];
 
   preConfigure = ''
@@ -156,12 +184,19 @@ stdenv.mkDerivation
 
   doCheck = true;
 
-  # Python tests are disabled at the moment because some tests expect grp and user
-  # databases with to be populated with gnt users and groups, which doesn't work
-  # in a sandbox.
+  preCheck = ''
+    substituteInPlace ./test/py/ganeti.utils.process_unittest.py  \
+      --replace "[\"env\"]" "[\"${coreutils.out}/bin/env\"]"
+
+    substituteInPlace ./test/py/ganeti.hooks_unittest.py  \
+      --replace "/bin/true" "${coreutils.out}/bin/true" \
+      --replace "/usr/bin/env" "${coreutils.out}/bin/env" \
+  '';
+
   checkPhase = ''
-    make hs-tests
-    # make py-tests
+    runHook preCheck
+    make hs-tests py-tests
+    runHook postCheck
   '';
 
   postFixup =
@@ -224,24 +259,7 @@ stdenv.mkDerivation
         "$out/lib/ganeti/tools/sanitize-config"
         "$out/lib/ganeti/tools/vcluster-setup"
       ];
-      binPath = lib.makeBinPath [
-        coreutils
-        util-linux
-        procps
-        systemd
-        gnutar
-        lvm2
-        iproute
-        iputils
-        fping
-        ndisc6
-        socat
-        openssh
-        openvswitch
-        multipath-tools
-        systemd
-        drbd
-      ];
+      binPath = lib.makeBinPath propagatedBuildInputs;
     in
     lib.intersperse "\n"
       (map
@@ -249,32 +267,33 @@ stdenv.mkDerivation
         (daemons ++ htools ++ pythonBinaries ++ tools));
 
   installPhase = ''
-    make install
-    install -d -m 755 $out/rc.d/init.d
-    install -d -m 755 $out/etc/bash_completion.d
-    install -d -m 755 $out/etc/cron.d
-    install -d -m 755 $out/etc/default
-    install -d -m 755 $out/etc/logrotate.d
-    install -d -m 755 $out/etc/sysconfig
+    make
+    install
+    install - d - m 755 $out/rc.d/init.d
+    install - d - m 755 $out/etc/bash_completion.d
+    install - d - m 755 $out/etc/cron.d
+    install - d - m 755 $out/etc/default
+    install - d - m 755 $out/etc/logrotate.d
+    install - d - m 755 $out/etc/sysconfig
 
-    install -m 644 doc/examples/bash_completion-debug $out/etc/bash_completion.d/ganeti
-    install -m 644 doc/examples/ganeti.cron $out/etc/cron.d/ganeti
-    install -m 644 doc/examples/ganeti.default $out/etc/default/ganeti
+    install - m 644 doc/examples/bash_completion-debug $out/etc/bash_completion.d/ganeti
+    install - m 644 doc/examples/ganeti.cron $out/etc/cron.d/ganeti
+    install - m 644 doc/examples/ganeti.default $out/etc/default/ganeti
 
-    install -d -m 755 $out/lib/systemd/system
-    install -m 644 doc/examples/systemd/ganeti-common.service $out/lib/systemd/system/ganeti-common.service
-    install -m 644 doc/examples/systemd/ganeti-confd.service  $out/lib/systemd/system/ganeti-confd.service
-    install -m 644 doc/examples/systemd/ganeti-kvmd.service   $out/lib/systemd/system/ganeti-kvmd.service
-    install -m 644 doc/examples/systemd/ganeti-luxid.service  $out/lib/systemd/system/ganeti-luxid.service
-    install -m 644 doc/examples/systemd/ganeti-metad.service  $out/lib/systemd/system/ganeti-metad.service
-    install -m 644 doc/examples/systemd/ganeti-mond.service   $out/lib/systemd/system/ganeti-mond.service
-    install -m 644 doc/examples/systemd/ganeti-noded.service  $out/lib/systemd/system/ganeti-noded.service
-    install -m 644 doc/examples/systemd/ganeti-rapi.service   $out/lib/systemd/system/ganeti-rapi.service
-    install -m 644 doc/examples/systemd/ganeti-wconfd.service $out/lib/systemd/system/ganeti-wconfd.service
+    install - d - m 755 $out/lib/systemd/system
+    install - m 644 doc/examples/systemd/ganeti-common.service $out/lib/systemd/system/ganeti-common.service
+    install - m 644 doc/examples/systemd/ganeti-confd.service  $out/lib/systemd/system/ganeti-confd.service
+    install - m 644 doc/examples/systemd/ganeti-kvmd.service   $out/lib/systemd/system/ganeti-kvmd.service
+    install - m 644 doc/examples/systemd/ganeti-luxid.service  $out/lib/systemd/system/ganeti-luxid.service
+    install - m 644 doc/examples/systemd/ganeti-metad.service  $out/lib/systemd/system/ganeti-metad.service
+    install - m 644 doc/examples/systemd/ganeti-mond.service   $out/lib/systemd/system/ganeti-mond.service
+    install - m 644 doc/examples/systemd/ganeti-noded.service  $out/lib/systemd/system/ganeti-noded.service
+    install - m 644 doc/examples/systemd/ganeti-rapi.service   $out/lib/systemd/system/ganeti-rapi.service
+    install - m 644 doc/examples/systemd/ganeti-wconfd.service $out/lib/systemd/system/ganeti-wconfd.service
 
-    install -m 644 doc/examples/systemd/ganeti-master.target  $out/lib/systemd/system/ganeti-master.target
-    install -m 644 doc/examples/systemd/ganeti-node.target    $out/lib/systemd/system/ganeti-node.target
-    install -m 644 doc/examples/systemd/ganeti.service        $out/lib/systemd/system/ganeti.service
-    install -m 644 doc/examples/systemd/ganeti.target         $out/lib/systemd/system/ganeti.target
+    install - m 644 doc/examples/systemd/ganeti-master.target  $out/lib/systemd/system/ganeti-master.target
+    install - m 644 doc/examples/systemd/ganeti-node.target    $out/lib/systemd/system/ganeti-node.target
+    install - m 644 doc/examples/systemd/ganeti.service        $out/lib/systemd/system/ganeti.service
+    install - m 644 doc/examples/systemd/ganeti.target         $out/lib/systemd/system/ganeti.target
   '';
 }

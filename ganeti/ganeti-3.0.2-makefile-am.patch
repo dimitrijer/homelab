@@ -1,5 +1,5 @@
 diff --git a/Makefile.am b/Makefile.am
-index aa92d2e30..769813cce 100644
+index aa92d2e30..934ec7372 100644
 --- a/Makefile.am
 +++ b/Makefile.am
 @@ -23,9 +23,6 @@ comma := ,
@@ -12,7 +12,33 @@ index aa92d2e30..769813cce 100644
  EXTRA_DIST=
  
  # Enable colors in shelltest
-@@ -2849,9 +2846,6 @@ dist-release: dist
+@@ -1923,7 +1920,6 @@ python_tests = \
+ 	test/py/cmdlib/test_unittest.py \
+ 	test/py/cfgupgrade_unittest.py \
+ 	test/py/docs_unittest.py \
+-	test/py/ganeti.asyncnotifier_unittest.py \
+ 	test/py/ganeti.backend_unittest-runasroot.py \
+ 	test/py/ganeti.backend_unittest.py \
+ 	test/py/ganeti.bootstrap_unittest.py \
+@@ -1936,9 +1932,7 @@ python_tests = \
+ 	test/py/ganeti.confd.client_unittest.py \
+ 	test/py/ganeti.config_unittest.py \
+ 	test/py/ganeti.constants_unittest.py \
+-	test/py/ganeti.daemon_unittest.py \
+ 	test/py/ganeti.errors_unittest.py \
+-	test/py/ganeti.hooks_unittest.py \
+ 	test/py/ganeti.ht_unittest.py \
+ 	test/py/ganeti.http_unittest.py \
+ 	test/py/ganeti.hypervisor.hv_chroot_unittest.py \
+@@ -1980,7 +1974,6 @@ python_tests = \
+ 	test/py/ganeti.storage.filestorage_unittest.py \
+ 	test/py/ganeti.storage.gluster_unittest.py \
+ 	test/py/ganeti.tools.burnin_unittest.py \
+-	test/py/ganeti.tools.ensure_dirs_unittest.py \
+ 	test/py/ganeti.tools.node_daemon_setup_unittest.py \
+ 	test/py/ganeti.tools.prepare_node_join_unittest.py \
+ 	test/py/ganeti.uidpool_unittest.py \
+@@ -2849,9 +2842,6 @@ dist-release: dist
  	done
  
  install-exec-local:
@@ -22,12 +48,12 @@ index aa92d2e30..769813cce 100644
  	for dir in $(SYMLINK_TARGET_DIRS); do \
  	  @mkdir_p@  $(DESTDIR)$$dir; \
  	done
-@@ -3056,7 +3050,7 @@ ganeti.cabal: cabal/ganeti.template.cabal Makefile cabal/cabal-from-modules.py $
+@@ -3056,7 +3046,7 @@ ganeti.cabal: cabal/ganeti.template.cabal Makefile cabal/cabal-from-modules.py $
  # Target that builds all binaries (including those that are not
  # rebuilt except when running the tests)
  .PHONY: really-all
 -really-all: all $(check_SCRIPTS) $(haskell_tests) $(HS_ALL_PROGS)
-+really-all: all $(HS_ALL_PROGS) $(BUILT_EXAMPLES)
++really-all: all $(check_SCRIPTS) $(haskell_tests) $(HS_ALL_PROGS) $(BUILT_EXAMPLES)
  
  # we don't need the ancient implicit rules:
  %: %,v
