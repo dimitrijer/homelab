@@ -1,8 +1,9 @@
 { pkgs, disko }:
 
 let
-  dest = "10.1.100.1";
-  as = "dimitrije";
+  deployHost = "10.1.100.1";
+  deployUser = "admin";
+  deployPath = "/usb1-part1/http/nixos/by-class/";
 
   mkNetbuild = { className, modules }:
     let
@@ -50,7 +51,7 @@ let
             echo "Supply path to private key as first argument"
             exit 1
           fi
-          ${pkgs.openssh}/bin/scp -i "$1" -r ${netbuild}/${targetDir} ${as}@${dest}:/srv/http/nixos/by-class/
+          ${pkgs.openssh}/bin/scp -i "$1" -r ${netbuild}/${targetDir} ${deployUser}@${deployHost}:${deployPath}
         '';
     };
 in
