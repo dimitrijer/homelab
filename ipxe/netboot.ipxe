@@ -1,6 +1,6 @@
 #!ipxe
 
-set boot-url http://10.1.100.1
+set boot-url http://${next-server}
 
 set menu-timeout 5000
 set menu-default netboot
@@ -10,6 +10,7 @@ menu iPXE boot menu for ${initiator-iqn}
 item --gap --             ------------------------- Operating systems ------------------------------
 item --key n netboot      Boot NixOS netboot (Legacy BIOS / EFI)
 item --key w arch         Boot Arch Linux installer (Legacy BIOS)
+item --key f gparted      Boot GParted (Legacy BIOS)
 item --key f freedos      Boot FreeDOS (Legacy BIOS)
 item --key w windows10    Boot Windows 10 installer media (EFI)
 item --gap --             ------------------------- Advanced options -------------------------------
@@ -21,6 +22,10 @@ goto ${selected}
 :arch
 echo Booting Arch...
 chain --replace --autofree ${boot-url}/arch/ipxe || goto failed
+
+:gparted
+echo Booting GParted...
+chain --replace --autofree ${boot-url}/gparted/ipxe || goto failed
 
 :freedos
 echo Booting FreeDOS...

@@ -1,6 +1,8 @@
 { pkgs, disko }:
 
 let
+  lib = pkgs.lib;
+  stdenv = pkgs.stdenv;
   deployHost = "10.1.100.1";
   deployUser = "admin";
   deployPath = "/usb1-part1/http/nixos/by-class/";
@@ -8,21 +10,28 @@ let
   mkNetbuild = { className, modules }:
     let
       sys =
-        pkgs.nixos
-          ({ modulesPath, ... }:
-            let
-              allModules = modules ++ [
-                (modulesPath + "/installer/netboot/netboot.nix")
-              ];
-            in
-            {
-              imports = allModules ++ [
-                # Allow "nixos-rebuild" to work properly by providing
-                # /etc/nixos/configuration.nix.
-                (modulesPath + "/profiles/clone-config.nix")
-              ];
-              config.installer.cloneConfigIncludes = modules;
-            });
+        (import (pkgs.path + "/nixos/lib/eval-config.nix") {
+          specialArgs.disko = disko;
+          modules = [
+            ({ modulesPath, ... }:
+              let
+                allModules = modules ++ [
+                  (modulesPath + "/installer/netboot/netboot.nix")
+                ];
+              in
+              {
+                imports = allModules ++ [
+                  # Allow "nixos-rebuild" to work properly by providing
+                  # /etc/nixos/configuration.nix.
+                  (modulesPath + "/profiles/clone-config.nix")
+                ];
+                config.installer.cloneConfigIncludes = modules;
+                config.nixpkgs.pkgs = lib.mkDefault pkgs;
+                config.nixpkgs.localSystem = lib.mkDefault stdenv.hostPlatform;
+              })
+          ];
+          system = null;
+        });
 
       build = sys.config.system.build;
 
@@ -60,7 +69,12 @@ in
     className = "ganeti-node";
     modules = [
       ./classes/ganeti-node.nix
-      ("${disko}/module.nix")
+    ];
+  };
+  navidrome = mkNetbuild {
+    className = "navidrome";
+    modules = [
+      ./classes/navidrome.nix
     ];
   };
 }

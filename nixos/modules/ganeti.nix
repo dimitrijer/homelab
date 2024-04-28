@@ -8,6 +8,7 @@ in
 {
   imports = [
     (modulesPath + "/virtualisation/openvswitch.nix")
+    ./provisioning/keys.nix
   ];
 
   options.virtualisation.ganeti = {
@@ -124,12 +125,12 @@ in
           );
       };
 
-      # Do not generate host keys, these are provisioned by provision-keys.service.
       services.openssh = {
-        enable = true;
-        hostKeys = lib.mkForce [ ];
         settings.PermitRootLogin = "yes";
       };
+
+      provisioning.keys.enable = true;
+      provisioning.keys.wantedBy = [ "ganeti.target" "ganeti-node.target" ];
 
       users.users.root.openssh.authorizedKeys.keys = lib.attrsets.mapAttrsToList
         (name: node: node.rootPubkey)
@@ -466,54 +467,6 @@ in
             # Important: do not kill any KVM processes
             KillMode = "process";
           };
-        };
-
-        "provision-keys" = {
-          description = "Provision root and host keys";
-          after = [ "network-online.target" ];
-          wants = [ "network-online.target" ];
-          before = [ "sshd.service" ];
-
-          path = with pkgs; [ coreutils curl openssh gnutar gzip ];
-          script = ''
-            set -eu -o pipefail
-
-            root_ssh_dir=/root/.ssh
-            mkdir -p $root_ssh_dir
-            root_key_path=$root_ssh_dir/id_ed25519
-            host_key_path=/etc/ssh/ssh_host_rsa_key
-            if [ ! -f $root_key_path ]; then
-              # wait for DHCP
-              sleep 5
-              target_dir=$(mktemp -d provision-keys.XXXXX)
-              trap "rm -rf $target_dir" EXIT
-              cd $target_dir
-
-              curl -sLO http://10.1.100.1/keys/$HOSTNAME.tar.gz
-              umask 077
-              tar -xzvf $HOSTNAME.tar.gz
-              cp host_privkey $host_key_path
-              cp root_privkey $root_key_path
-              umask 022
-              ssh-keygen -yf $host_key_path >$host_key_path.pub
-              root_fingerprint=$(ssh-keygen -lf $root_key_path)
-              host_fingerprint=$(ssh-keygen -lf $host_key_path.pub)
-              echo "Downloaded private root key to $root_key_path (fingerprint=$root_fingerprint)"
-              echo "Downloaded private host key to $host_key_path (fingerprint=$host_fingerprint)"
-            else
-              echo "Key already exists, nothing to do."
-            fi
-          '';
-
-          serviceConfig = {
-            Type = "oneshot";
-            User = "root";
-            Group = "root";
-            Restart = "on-failure";
-            RestartSec = "10";
-          };
-          wantedBy = [ "ganeti.target" "ganeti-node.target" ];
-          requiredBy = [ "sshd.service" ];
         };
       };
     };

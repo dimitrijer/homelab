@@ -1,16 +1,17 @@
-{ pkgs, config, lib, modulesPath, ... }:
+{ pkgs, config, lib, modulesPath, disko, ... }:
 
 let
   hddDevice = "/dev/sda";
   nvmeDevice = "/dev/nvme0n1";
   vgGaneti = "pool_gnt";
   vgHost = "pool_host";
-  disko-fmt = pkgs.writeShellScriptBin "disko-fmt" "${config.system.build.formatScript}";
-  disko-mnt = pkgs.writeShellScriptBin "disko-mnt" "${config.system.build.mountScript}";
 in
 {
   imports = [
     (modulesPath + "/profiles/minimal.nix")
+    ("${disko}/module.nix")
+    ../modules/common.nix
+    ../modules/provisioning/disks.nix
     ../modules/ganeti.nix
   ];
 
@@ -54,47 +55,6 @@ in
         osProviders = [ pkgs.ganeti-os-pxe ];
       };
 
-      # Will be provided via kernel cmdline.
-      networking.hostName = lib.mkForce "";
-      console.keyMap = "us";
-      time.timeZone = "Europe/London";
-
-      users.users.dimitrije =
-        {
-          isNormalUser = true;
-          home = "/home/dimitrije";
-          description = "Dimitrije Radojevic";
-          extraGroups = [ "wheel" ];
-          openssh.authorizedKeys.keys = [ "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJklWVMXaRPHb2+px018aQdEldAtzt9+MZHqImMmDFZa dimitrije@prospect" ];
-        };
-
-      users.users.root.initialHashedPassword = "$y$j9T$gChWZEYyiVSALFhhHwI39.$UrwTZVYmKMvUp9tQbcTpaNeYKI7w3uRyZ3KcgqnxcK1";
-
-      security.sudo = {
-        enable = true;
-        extraRules = [{
-          commands = [
-            {
-              command = "ALL";
-              options = [ "NOPASSWD" ];
-            }
-          ];
-          groups = [ "wheel" ];
-        }];
-      };
-
-      networking.firewall = {
-        enable = true;
-        allowedTCPPorts = [ 22 ]; # ssh
-      };
-
-      services.openssh = {
-        enable = true;
-      };
-
-      networking.enableIPv6 = false;
-      system.stateVersion = config.system.nixos.release;
-
       boot.kernelParams = [
         "console=tty0"
         "console=ttyS1,19200" # serial over LAN
@@ -119,136 +79,87 @@ in
 
       services.fwupd.enable = true;
 
-      disko = {
-        # Do not override config.filesystems etc. using disko config.
-        enableConfig = false;
-        rootMountPoint = "/";
-        devices = {
-          disk = {
-            ssd = {
-              device = nvmeDevice;
-              type = "disk";
-              name = "ssd";
-              content = {
-                type = "lvm_pv";
-                vg = vgGaneti;
-              };
+      disko.devices = {
+        disk = {
+          ssd = {
+            device = nvmeDevice;
+            type = "disk";
+            name = "ssd";
+            content = {
+              type = "lvm_pv";
+              vg = vgGaneti;
             };
-            hdd = {
-              device = hddDevice;
-              type = "disk";
-              name = "hdd";
-              content = {
-                type = "gpt";
-                partitions = {
-                  # EFI system partition cannot be a LV
-                  ESP = {
-                    type = "EF00";
-                    start = "1M";
-                    end = "100M";
-                    content = {
-                      type = "filesystem";
-                      format = "vfat";
-                      mountpoint = "/boot";
-                    };
+          };
+          hdd = {
+            device = hddDevice;
+            type = "disk";
+            name = "hdd";
+            content = {
+              type = "gpt";
+              partitions = {
+                # EFI system partition cannot be a LV
+                ESP = {
+                  type = "EF00";
+                  start = "1M";
+                  end = "100M";
+                  content = {
+                    type = "filesystem";
+                    format = "vfat";
+                    mountpoint = "/boot";
                   };
-                  pool_host = {
-                    size = "100%";
-                    content = {
-                      type = "lvm_pv";
-                      vg = vgHost;
-                    };
+                };
+                pool_host = {
+                  size = "100%";
+                  content = {
+                    type = "lvm_pv";
+                    vg = vgHost;
                   };
                 };
               };
             };
           };
+        };
 
-          lvm_vg = {
-            "${vgHost}" = {
-              type = "lvm_vg";
-              lvs = {
-                swap = {
-                  size = "32G";
-                  content = {
-                    type = "swap";
-                  };
+        lvm_vg = {
+          "${vgHost}" = {
+            type = "lvm_vg";
+            lvs = {
+              swap = {
+                size = "32G";
+                content = {
+                  type = "swap";
                 };
-                home = {
-                  size = "100G";
-                  content = {
-                    type = "filesystem";
-                    format = "xfs";
-                    mountpoint = "/home";
-                  };
+              };
+              home = {
+                size = "100G";
+                content = {
+                  type = "filesystem";
+                  format = "xfs";
+                  mountpoint = "/home";
                 };
-                var = {
-                  size = "100%FREE";
-                  content = {
-                    type = "filesystem";
-                    format = "xfs";
-                    mountpoint = "/var";
-                  };
+              };
+              var = {
+                size = "100%FREE";
+                content = {
+                  type = "filesystem";
+                  format = "xfs";
+                  mountpoint = "/var";
                 };
               };
             };
+          };
 
-            "${vgGaneti}" = {
-              type = "lvm_vg";
-              lvs = { };
-            };
+          "${vgGaneti}" = {
+            type = "lvm_vg";
+            lvs = { };
           };
         };
       };
 
-      systemd.services."provision-disks" = {
-        description = "Provision and/or mount disks";
-        before = [ "local-fs.target" ];
-        wants = [ "local-fs-pre.target" ];
-        after = [ "local-fs-pre.target" ];
+      provisioning.disks.enable = true;
 
-        path = with pkgs; [ coreutils util-linux lvm2 disko-fmt disko-mnt ];
-        script = ''
-          set -eu -o pipefail
-
-          if ! vgs ${vgGaneti} ${vgHost} -o name --noheadings 2>&1 >/dev/null
-          then
-            for vg in $(vgs --noheadings -o name --rows)
-            do
-              echo "Removing VG $vg..."
-              vgremove -f -y "$vg"
-            done
-
-            for pv in $(pvs --noheadings -o name --rows)
-            do
-              echo "Removing PV $pv..."
-              pvremove -f "$pv"
-            done
-
-            echo "Wiping disks..."
-            wipefs -a ${hddDevice}
-            wipefs -a ${nvmeDevice}
-
-            echo "Provisioning disks..."
-            ${disko-fmt.out}/bin/disko-fmt
-          fi
-
-          echo "Mounting local disks..."
-          ${disko-mnt.out}/bin/disko-mnt
-        '';
-
-        unitConfig = {
-          DefaultDependencies = "no";
-        };
-        serviceConfig = {
-          Type = "oneshot";
-        };
-        requiredBy = [ "local-fs.target" ];
-      };
       environment.systemPackages = with pkgs;
         [
-          disko-fmt
-          disko-mnt
           python3
           git
           ethtool
