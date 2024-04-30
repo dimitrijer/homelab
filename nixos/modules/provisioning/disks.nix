@@ -28,7 +28,7 @@ in
 
     systemd.services."provision-disks" = {
       description = "Provision and/or mount disks";
-      before = [ "local-fs.target" ];
+      before = [ "local-fs.target" "systemd-journald.service" ];
       wants = [ "local-fs-pre.target" ];
       after = [ "local-fs-pre.target" ];
 
@@ -88,7 +88,7 @@ in
       serviceConfig = {
         Type = "oneshot";
       };
-      requiredBy = [ "local-fs.target" ];
+      requiredBy = [ "local-fs.target" "systemd-journald.service" ];
     };
 
     environment.systemPackages = with pkgs;
