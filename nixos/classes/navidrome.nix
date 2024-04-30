@@ -1,43 +1,26 @@
-{ pkgs, config, lib, modulesPath, disko, ... }:
+{ config, pkgs, modulesPath, ... }:
 
 let
-  vgState = "pool_state";
-  blockDevice = "/dev/vda";
   musicDir = "/data/music";
-  disko-fmt = pkgs.writeShellScriptBin "disko-fmt" "${config.system.build.formatScript}";
-  disko-mnt = pkgs.writeShellScriptBin "disko-mnt" "${config.system.build.mountScript}";
 in
 {
   imports = [
-    (modulesPath + "/profiles/minimal.nix")
-    (modulesPath + "/profiles/qemu-guest.nix")
-    (modulesPath + "/services/audio/navidrome.nix")
-    ("${disko}/module.nix")
-    ../modules/common.nix
+    ../modules/common-vm.nix
+    ../modules/cert.nix
     ../modules/provisioning/keys.nix
     ../modules/provisioning/disks.nix
+    (modulesPath + "/services/audio/navidrome.nix")
   ];
 
   config =
     {
       provisioning.keys.enable = true;
       provisioning.disks.enable = true;
-      provisioning.disks.ensureDirs = [ "/data/music" ];
+      provisioning.disks.ensureDirs = [ musicDir ];
 
-      boot.kernelParams = [
-        "console=tty0"
-        "console=ttyS0,115200" # gnt serial console
-      ];
-
-      systemd.services."serial-getty@ttyS0" = {
-        enable = true;
-        wantedBy = [ "getty.target" ];
-        serviceConfig.Restart = "always";
-      };
-
-      disko.devices = {
+      disko.devices = let vgState = "pool_state"; in {
         disk.hdd = {
-          device = blockDevice;
+          device = "/dev/vda";
           type = "disk";
           name = "hdd";
           content = {
@@ -80,17 +63,29 @@ in
       services.navidrome = {
         enable = true;
         package = pkgs.navidrome;
-        settings = {
-          Address = "0.0.0.0";
-          Port = 4533;
-          MusicFolder = musicDir;
-        };
-        openFirewall = true;
+        settings.MusicFolder = musicDir;
+        openFirewall = false;
       };
 
-      environment.systemPackages = with pkgs;
-        [
-          vim
-        ];
+      networking.firewall.allowedTCPPorts = [ 80 443 ];
+
+      security.acme.certs."navidrome.homelab.tel" = { group = "nginx"; };
+
+      services.nginx = {
+        enable = true;
+        recommendedProxySettings = true;
+        recommendedTlsSettings = true;
+        virtualHosts."navidrome" = {
+          rejectSSL = true;
+          locations."/".return = "301 https://navidrome.homelab.tel$request_uri";
+        };
+        virtualHosts."navidrome.homelab.tel" = {
+          forceSSL = true;
+          useACMEHost = "navidrome.homelab.tel";
+          locations."/" = {
+            proxyPass = "http://127.0.0.1:${toString config.services.navidrome.settings.Port}";
+          };
+        };
+      };
     };
 }

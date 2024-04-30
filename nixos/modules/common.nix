@@ -1,6 +1,10 @@
-{ config, pkgs, lib, ... }:
+{ config, pkgs, lib, modulesPath, ... }:
 
 {
+  imports = [
+    (modulesPath + "/profiles/minimal.nix")
+  ];
+
   users.users.dimitrije =
     {
       isNormalUser = true;
