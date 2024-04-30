@@ -65,6 +65,12 @@ let
     };
 in
 {
+  calibre-web = mkNetbuild {
+    className = "calibre-web";
+    modules = [
+      ./classes/calibre-web.nix
+    ];
+  };
   ganeti-node = mkNetbuild {
     className = "ganeti-node";
     modules = [
