@@ -23,7 +23,7 @@ in
         clusterName = "gnt";
         adminUsers = [ "dimitrije" ];
         primaryInterface = "enp0s31f6";
-        domain = "homelab";
+        domain = "homelab.tel";
         vgName = vgGaneti;
         nodes = {
           aleph = {
