@@ -1,14 +1,26 @@
 {
+    "agenix": {
+        "branch": "main",
+        "description": "age-encrypted secrets for NixOS and Home manager",
+        "homepage": "https://matrix.to/#/#agenix:nixos.org",
+        "owner": "ryantm",
+        "repo": "agenix",
+        "rev": "24a7ea390564ccd5b39b7884f597cfc8d7f6f44e",
+        "sha256": "165am10r61wl5v4hz169zrlljvj929hgnhr9sn7ak3bz73cr1m86",
+        "type": "tarball",
+        "url": "https://github.com/ryantm/agenix/archive/24a7ea390564ccd5b39b7884f597cfc8d7f6f44e.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
     "disko": {
         "branch": "master",
         "description": "Format disks with nix-config [maintainer=@Lassulus]",
         "homepage": "",
         "owner": "nix-community",
         "repo": "disko",
-        "rev": "285e26465a0bae510897ca04da26ce6307c652b4",
-        "sha256": "0clj35a0rwxci2ss6401gyi3w803bz01ixis6pdxvkmap4i65h4i",
+        "rev": "5eaf747af38dd272e1ab28a8ec4bd972424b07cf",
+        "sha256": "1dk4xi79lvm8hv1raf2snm3j8y4q23csm6d3siljg4cpf2y4wyl7",
         "type": "tarball",
-        "url": "https://github.com/nix-community/disko/archive/285e26465a0bae510897ca04da26ce6307c652b4.tar.gz",
+        "url": "https://github.com/nix-community/disko/archive/5eaf747af38dd272e1ab28a8ec4bd972424b07cf.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixfiles": {
@@ -29,10 +41,10 @@
         "homepage": null,
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "2b1f64b358f2cab62617f26b3870fd0ee375d848",
-        "sha256": "1iy5vigbw2dx7rhzmsszc7d87sw545f0vw4kcwxk3mazxg9qrzgl",
+        "rev": "bcd44e224fd68ce7d269b4f44d24c2220fd821e7",
+        "sha256": "1dd8x811mkm0d89b0yy0cgv28g343bnid0xn2psd3sk1nkgx9g9j",
         "type": "tarball",
-        "url": "https://github.com/NixOS/nixpkgs/archive/2b1f64b358f2cab62617f26b3870fd0ee375d848.tar.gz",
+        "url": "https://github.com/NixOS/nixpkgs/archive/bcd44e224fd68ce7d269b4f44d24c2220fd821e7.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixpkgs-21-11": {

@@ -68,6 +68,7 @@ let
   netbuildClasses = import ./nixos/default.nix {
     inherit pkgs;
     disko = sources.disko;
+    agenix = sources.agenix;
   };
 in
 {

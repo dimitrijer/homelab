@@ -1,4 +1,4 @@
-{ pkgs, disko }:
+{ pkgs, disko, agenix }:
 
 let
   lib = pkgs.lib;
@@ -12,6 +12,7 @@ let
       sys =
         (import (pkgs.path + "/nixos/lib/eval-config.nix") {
           specialArgs.disko = disko;
+          specialArgs.agenix = agenix;
           modules = [
             ({ modulesPath, ... }:
               let
