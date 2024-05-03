@@ -70,6 +70,8 @@ in
       networking.firewall.allowedTCPPorts = [ 80 443 ];
 
       security.acme.certs."navidrome.homelab.tel" = { group = "nginx"; };
+      systemd.services."acme-navidrome.homelab.tel".after = [ "agenix-install-secrets.service" ];
+      systemd.services."acme-navidrome.homelab.tel".requires = [ "agenix-install-secrets.service" ];
 
       services.nginx = {
         enable = true;

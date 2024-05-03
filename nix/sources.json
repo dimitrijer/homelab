@@ -3,12 +3,12 @@
         "branch": "main",
         "description": "age-encrypted secrets for NixOS and Home manager",
         "homepage": "https://matrix.to/#/#agenix:nixos.org",
-        "owner": "ryantm",
-        "repo": "agenix",
-        "rev": "24a7ea390564ccd5b39b7884f597cfc8d7f6f44e",
-        "sha256": "165am10r61wl5v4hz169zrlljvj929hgnhr9sn7ak3bz73cr1m86",
+        "owner": "dimitrijer",
+        "repo": "agenix-as-oneshot-service",
+        "rev": "db93ffa35efa577c3eae6a5f428bf328b994119c",
+        "sha256": "0aln61lqz89k1z12hj420xi8jyp8spzk4hsw5c4cklcr30i5ir7s",
         "type": "tarball",
-        "url": "https://github.com/ryantm/agenix/archive/24a7ea390564ccd5b39b7884f597cfc8d7f6f44e.tar.gz",
+        "url": "https://github.com/dimitrijer/agenix-as-oneshot-service/archive/db93ffa35efa577c3eae6a5f428bf328b994119c.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "disko": {
@@ -17,10 +17,10 @@
         "homepage": "",
         "owner": "nix-community",
         "repo": "disko",
-        "rev": "5eaf747af38dd272e1ab28a8ec4bd972424b07cf",
-        "sha256": "1dk4xi79lvm8hv1raf2snm3j8y4q23csm6d3siljg4cpf2y4wyl7",
+        "rev": "d57058eb09dd5ec00c746df34fe0a603ea744370",
+        "sha256": "0l9v6ilvi1dwilvx8xifnf8p775z2kbdhkbprqpxm6firjsapgsv",
         "type": "tarball",
-        "url": "https://github.com/nix-community/disko/archive/5eaf747af38dd272e1ab28a8ec4bd972424b07cf.tar.gz",
+        "url": "https://github.com/nix-community/disko/archive/d57058eb09dd5ec00c746df34fe0a603ea744370.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixfiles": {

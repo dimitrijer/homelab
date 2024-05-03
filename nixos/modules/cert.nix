@@ -14,6 +14,13 @@
     };
   };
 
-  age.secrets.namecheap-ini.file = ../../secrets/namecheap.ini.age;
+  age.secrets.namecheap-ini =
+    {
+      file = ../secrets/namecheap.ini.age;
+      owner = "nginx";
+    };
   age.identityPaths = [ "/etc/ssh/ssh_host_rsa_key" ];
+  age.asOneshotService = true;
+  provisioning.keys.requiredBy = [ "agenix-install-secrets.service" ];
+  provisioning.keys.before = [ "agenix-install-secrets.service" ];
 }
