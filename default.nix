@@ -55,7 +55,7 @@ let
       overlays = [ drbdOverlay qemuOverlay ghcOverlay ];
     };
   ganeti = pkgs-21-11.callPackage ./ganeti/default.nix { };
-  ganeti-os-providers = import ./ganeti/os-providers/default.nix { pkgs = pkgs-21-11; };
+  ganeti-os-providers = import ./ganeti/os-providers/default.nix { pkgs = pkgs-unstable; };
   pkgs =
     let
       ganetiOverlay = self: super: { inherit ganeti; };

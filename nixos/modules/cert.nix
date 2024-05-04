@@ -1,4 +1,4 @@
-{ config, modulesPath, agenix, ... }:
+{ config, modulesPath, lib, agenix, ... }:
 
 {
   imports = [ "${agenix}/modules/age.nix" ];
@@ -21,6 +21,8 @@
     };
   age.identityPaths = [ "/etc/ssh/ssh_host_rsa_key" ];
   age.asOneshotService = true;
-  provisioning.keys.requiredBy = [ "agenix-install-secrets.service" ];
-  provisioning.keys.before = [ "agenix-install-secrets.service" ];
+  systemd.services."provision-keys" = lib.mkIf config.provisioning.keys.enable {
+    requiredBy = [ "agenix-install-secrets.service" ];
+    before = [ "agenix-install-secrets.service" ];
+  };
 }

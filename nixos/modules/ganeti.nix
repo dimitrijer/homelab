@@ -130,7 +130,7 @@ in
       };
 
       provisioning.keys.enable = true;
-      provisioning.keys.wantedBy = [ "ganeti.target" "ganeti-node.target" ];
+      systemd.services."provision-keys".wantedBy = [ "ganeti.target" "ganeti-node.target" ];
 
       users.users.root.openssh.authorizedKeys.keys = lib.attrsets.mapAttrsToList
         (name: node: node.rootPubkey)

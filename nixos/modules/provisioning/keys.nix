@@ -12,16 +12,6 @@ in
       type = types.str;
       default = "http://10.1.100.1/keys/";
     };
-    before = mkOption {
-      type = types.listOf types.str;
-      description = "list of systemd services / targets that require this service";
-      default = [ "sshd.service" ];
-    };
-    requiredBy = mkOption {
-      type = types.listOf types.str;
-      description = "list of systemd services / targets that require this service";
-      default = [ "sshd.service" ];
-    };
   };
 
   config = mkIf cfg.enable {
@@ -29,7 +19,7 @@ in
       description = "Provision root and host keys";
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
-      before = cfg.before ++ lib.optionals config.services.openssh.enable [ "sshd.service" ];
+      before = [ ] ++ lib.optionals config.services.openssh.enable [ "sshd.service" ];
 
       path = with pkgs; [ coreutils curl openssh gnutar gzip ];
       script = ''
@@ -70,7 +60,7 @@ in
         RestartSec = "10";
       };
       wantedBy = [ "multi-user.target" ];
-      requiredBy = cfg.requiredBy ++ lib.optionals config.services.openssh.enable [ "sshd.service" ];
+      requiredBy = [ ] ++ lib.optionals config.services.openssh.enable [ "sshd.service" ];
     };
 
     # Do not generate host keys, these are provisioned by provision-keys.service.
