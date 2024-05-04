@@ -16,5 +16,4 @@
     wantedBy = [ "getty.target" ];
     serviceConfig.Restart = "always";
   };
-
 }

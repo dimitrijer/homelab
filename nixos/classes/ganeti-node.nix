@@ -8,8 +8,6 @@ let
 in
 {
   imports = [
-    (modulesPath + "/profiles/minimal.nix")
-    ("${disko}/module.nix")
     ../modules/common.nix
     ../modules/provisioning/disks.nix
     ../modules/ganeti.nix

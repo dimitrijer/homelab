@@ -84,4 +84,10 @@ in
       ./classes/navidrome.nix
     ];
   };
+  metrics = mkNetbuild {
+    className = "metrics";
+    modules = [
+      ./classes/metrics.nix
+    ];
+  };
 }
