@@ -17,7 +17,7 @@
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIN7gdT/00QarOYM33vpSOu/KxCUoj8WuLkB+1QFAJ1+Y dimitrije@mackinaw"
       ];
     };
-  users.users.root.initialHashedPassword = "$y$j9T$gChWZEYyiVSALFhhHwI39.$UrwTZVYmKMvUp9tQbcTpaNeYKI7w3uRyZ3KcgqnxcK1";
+  users.users.root.initialHashedPassword = "$6$OZ8xMsNhdISbKv8P$mj2ZqKDCBoxy59H/XphKKnQu3yxIHgwwI9hP3CJdIZHWzRh0boT9dfWArJjoIxAUsMpdxtybdKSr0X01Kclf81";
 
   security.sudo = {
     enable = true;
