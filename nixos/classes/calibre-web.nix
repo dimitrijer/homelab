@@ -80,6 +80,8 @@ in
       networking.firewall.allowedTCPPorts = [ 80 443 ];
 
       security.acme.certs."calibre.homelab.tel" = { group = "nginx"; };
+      systemd.services."acme-calibre.homelab.tel".after = [ "agenix-install-secrets.service" ];
+      systemd.services."acme-calibre.homelab.tel".requires = [ "agenix-install-secrets.service" ];
 
       services.nginx = {
         enable = true;
