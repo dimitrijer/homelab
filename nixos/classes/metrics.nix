@@ -26,7 +26,15 @@ in
     listenAddress = "127.0.0.1";
     scrapeConfigs = [
       {
+        job_name = "prometheus";
+        scrape_interval = "15s";
+        static_configs = [{
+          targets = [ "localhost:9090" ];
+        }];
+      }
+      {
         job_name = "node";
+        scrape_interval = "15s";
         dns_sd_configs = [{
           names = [ "scrape-targets.homelab.tel" ];
           refresh_interval = "300s";
