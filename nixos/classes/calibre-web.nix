@@ -1,7 +1,8 @@
 { pkgs, config, lib, modulesPath, disko, ... }:
 
 let
-  booksDir = "/data/books";
+  booksDir = "/var/lib/calibre";
+  domain = "calibre.homelab.tel";
 in
 {
   imports = [
@@ -81,9 +82,11 @@ in
 
       networking.firewall.allowedTCPPorts = [ 80 443 ];
 
-      security.acme.certs."calibre.homelab.tel" = { group = "nginx"; };
-      systemd.services."acme-calibre.homelab.tel".after = [ "agenix-install-secrets.service" ];
-      systemd.services."acme-calibre.homelab.tel".requires = [ "agenix-install-secrets.service" ];
+      security.acme.certs."${domain}" = { group = "nginx"; };
+      systemd.services."acme-${domain}" = {
+        after = [ "agenix-install-secrets.service" ];
+        requires = [ "agenix-install-secrets.service" ];
+      };
 
       services.nginx = {
         enable = true;
@@ -91,17 +94,17 @@ in
         recommendedTlsSettings = true;
         virtualHosts."calibre-web" = {
           rejectSSL = true;
-          locations."/".return = "301 https://calibre.homelab.tel$request_uri";
+          locations."/".return = "301 https://${domain}$request_uri";
         };
         virtualHosts."calibre" = {
           rejectSSL = true;
-          locations."/".return = "301 https://calibre.homelab.tel$request_uri";
+          locations."/".return = "301 https://${domain}$request_uri";
         };
-        virtualHosts."calibre.homelab.tel" = {
+        virtualHosts."${domain}" = {
           forceSSL = true;
-          useACMEHost = "calibre.homelab.tel";
+          useACMEHost = "${domain}";
           locations."/" = {
-            proxyPass = "http://127.0.0.1:${toString config.services.calibre-web.listen.port}";
+            proxyPass = "http://${config.services.calibre-web.listen.ip}:${toString config.services.calibre-web.listen.port}";
           };
         };
       };
