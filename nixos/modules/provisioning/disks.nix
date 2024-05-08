@@ -57,8 +57,13 @@ in
           echo "Waiting for disks to settle..."
           sleep 5
 
+          echo "Scanning for VGs..."
+          vgscan
+
           if ! vgs ${vgsList} -o name --noheadings 2>&1 >/dev/null
           then
+            echo "Could not detect VGs, will provision disks..."
+
             for vg in $(vgs --noheadings -o name --rows)
             do
               echo "Removing VG $vg..."
@@ -80,6 +85,8 @@ in
             ${rereadPTCmd}
             echo "Provisioning disks..."
             disko-fmt
+          else
+            echo "VGs detected, skipping provisioning..."
           fi
 
           echo "Mounting local disks..."

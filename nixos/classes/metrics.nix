@@ -67,14 +67,6 @@ in
     lvm_vg."${vgState}" = {
       type = "lvm_vg";
       lvs = {
-        data = {
-          size = "8G";
-          content = {
-            type = "filesystem";
-            format = "xfs";
-            mountpoint = "/data";
-          };
-        };
         home = {
           size = "500M";
           content = {
