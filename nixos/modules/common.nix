@@ -18,6 +18,13 @@
       ];
     };
   users.users.root.initialHashedPassword = "$6$OZ8xMsNhdISbKv8P$mj2ZqKDCBoxy59H/XphKKnQu3yxIHgwwI9hP3CJdIZHWzRh0boT9dfWArJjoIxAUsMpdxtybdKSr0X01Kclf81";
+  provisioning.disks = {
+    ensureDirs = [{
+      path = config.users.users.dimitrije.home;
+      owner = "dimitrije";
+      group = "users";
+    }];
+  };
 
   security.sudo = {
     enable = true;

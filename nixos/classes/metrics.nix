@@ -46,7 +46,11 @@ in
   provisioning.keys.enable = true;
   provisioning.disks = {
     enable = true;
-    ensureDirs = [ config.services.grafana.dataDir ];
+    ensureDirs = [{
+      path = config.services.grafana.dataDir;
+      owner = "grafana";
+      group = "grafana";
+    }];
   };
 
   disko.devices = let vgState = "pool_state"; in {

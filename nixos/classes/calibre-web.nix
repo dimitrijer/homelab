@@ -16,7 +16,11 @@ in
     {
       provisioning.keys.enable = true;
       provisioning.disks.enable = true;
-      provisioning.disks.ensureDirs = [ booksDir ];
+      provisioning.disks.ensureDirs = [{
+        path = booksDir;
+        owner = "calibre-web";
+        group = "calibre-web";
+      }];
 
       disko.devices = let vgState = "pool_state"; in {
         disk.hdd = {

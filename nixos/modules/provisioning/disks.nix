@@ -13,8 +13,15 @@ in
   options.provisioning.disks = {
     enable = mkEnableOption "enable disk provisioning";
     ensureDirs = mkOption {
-      type = types.listOf types.path;
-      description = "list of directories to mkdir -p";
+      type = types.listOf (types.submodule {
+        options = {
+          owner = mkOption { type = types.str; default = "root"; };
+          group = mkOption { type = types.str; default = "root"; };
+          path = mkOption { type = types.path; };
+          mod = mkOption { type = types.int; default = 755; };
+        };
+      });
+      description = "list of directories to ensure exist";
       default = [ ];
     };
   };
@@ -42,7 +49,7 @@ in
           indent = concatLinesWithIndent "  ";
           wipeDisksCmd = indent (map (blockdev: "wipefs -af ${blockdev}") blockDevs);
           rereadPTCmd = indent (map (blockdev: "blockdev --rereadpt ${blockdev}") blockDevs);
-          ensureDirsCmd = indent (map (dir: "mkdir -p ${dir}") cfg.ensureDirs);
+          ensureDirsCmd = indent (map (dir: "mkdir -p '${dir.path}'; chown ${dir.owner}:${dir.group} '${dir.path}'; chmod ${toString dir.mod} '${dir.path}'") cfg.ensureDirs);
         in
         ''
           set -eu -o pipefail
