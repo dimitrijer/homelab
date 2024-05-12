@@ -90,4 +90,10 @@ in
       ./classes/metrics.nix
     ];
   };
+  paperless = mkNetbuild {
+    className = "paperless";
+    modules = [
+      ./classes/paperless.nix
+    ];
+  };
 }
