@@ -3,6 +3,7 @@
 let
   booksDir = "/var/lib/calibre";
   domain = "calibre.homelab.tel";
+  mkLayout = (import ../layouts).mkLayout;
 in
 {
   imports = [
@@ -23,45 +24,7 @@ in
         group = "calibre-web";
       }];
 
-      disko.devices = let vgState = "pool_state"; in {
-        disk.hdd = {
-          device = "/dev/vda";
-          type = "disk";
-          name = "hdd";
-          content = {
-            type = "lvm_pv";
-            vg = vgState;
-          };
-        };
-
-        lvm_vg."${vgState}" = {
-          type = "lvm_vg";
-          lvs = {
-            home = {
-              size = "500M";
-              content = {
-                type = "filesystem";
-                format = "xfs";
-                mountpoint = "/home";
-              };
-            };
-            swap = {
-              size = "1G";
-              content = {
-                type = "swap";
-              };
-            };
-            var = {
-              size = "100%FREE";
-              content = {
-                type = "filesystem";
-                format = "xfs";
-                mountpoint = "/var";
-              };
-            };
-          };
-        };
-      };
+      disko.devices = mkLayout { };
 
       services.calibre-web = {
         enable = true;

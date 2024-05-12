@@ -2,6 +2,7 @@
 
 let
   musicDir = "/data/music";
+  mkLayout = (import ../layouts).mkLayout;
 in
 {
   imports = [
@@ -18,47 +19,7 @@ in
       provisioning.disks.enable = true;
       provisioning.disks.ensureDirs = [ musicDir ];
 
-      disko.devices = let vgState = "pool_state"; in {
-        disk.hdd = {
-          device = "/dev/vda";
-          type = "disk";
-          name = "hdd";
-          content = {
-            type = "lvm_pv";
-            vg = vgState;
-          };
-        };
-
-        lvm_vg."${vgState}" = {
-          type = "lvm_vg";
-          lvs = {
-            data = {
-              size = "8G";
-              content = {
-                type = "filesystem";
-                format = "xfs";
-                mountpoint = "/data";
-              };
-            };
-            home = {
-              size = "500M";
-              content = {
-                type = "filesystem";
-                format = "xfs";
-                mountpoint = "/home";
-              };
-            };
-            var = {
-              size = "100%FREE";
-              content = {
-                type = "filesystem";
-                format = "xfs";
-                mountpoint = "/var";
-              };
-            };
-          };
-        };
-      };
+      disko.devices = mkLayout { };
 
       services.navidrome = {
         enable = true;
