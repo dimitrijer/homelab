@@ -17,14 +17,36 @@ in
         freeformType = settingsFormat.type;
         options = {
           default = {
-            port = mkOption { type = types.int; description = "port that prometheus-ganeti-exporter listens on"; default = 8000; };
-            verify_tls = mkOption { type = types.bool; description = "check certificates when connecting"; default = false; };
-            refresh_interval = mkOption { type = types.ints.positive; description = "refresh interval in seconds"; default = 10; };
+            port = mkOption {
+              type = types.int;
+              description = "port that prometheus-ganeti-exporter listens on";
+              default = 8000;
+            };
+            verify_tls = mkOption {
+              type = types.bool;
+              description = "check certificates when connecting";
+              default = false;
+            };
+            refresh_interval = mkOption {
+              type = types.ints.positive;
+              description = "refresh interval in seconds";
+              default = 10;
+            };
           };
           ganeti = {
-            api = mkOption { type = types.str; description = "full URL of RAPI endpoint"; default = "https://localhost:5080"; };
-            user = mkOption { type = types.str; description = "Ganeti RAPI user"; default = "prometheus-ganeti-exporter"; };
-            password = mkOption { type = types.str; description = "Ganeti RAPI passowrd"; default = "prometheus-ganeti-exporter"; };
+            api = mkOption {
+              type = types.str;
+              description = "full URL of RAPI endpoint";
+              default = "https://localhost:5080";
+            };
+            user = mkOption {
+              type = types.str;
+              description = "Ganeti RAPI user";
+            };
+            password = mkOption {
+              type = types.str;
+              description = "Ganeti RAPI password";
+            };
           };
         };
       };
@@ -75,6 +97,7 @@ in
           User = cfg.user;
           Group = cfg.group;
           Restart = "always";
+          RestartSec = "30s";
           ReadWritePaths = "";
           CapabilityBoundingSet = "";
           RestrictAddressFamilies = [

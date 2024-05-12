@@ -63,7 +63,7 @@ in
 
       services.prometheus.exporters.ganeti = {
         enable = true;
-        settings.ganeti.api = "https://gnt.homelab.tel:5080";
+        settings.ganeti.api = "https://127.0.0.1:5080";
       };
 
       boot.kernelParams = [

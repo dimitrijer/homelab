@@ -1,6 +1,7 @@
 { pkgs, config, lib, modulesPath, disko, ... }:
 
 let
+  mkLayout = (import ../layouts).mkLayout;
   domain = "metrics.homelab.tel";
 in
 {
@@ -40,6 +41,13 @@ in
           refresh_interval = "300s";
         }];
       }
+      {
+        job_name = "ganeti";
+        scrape_interval = "15s";
+        static_configs = [{
+          targets = [ "gnt.homelab.tel:8000" ];
+        }];
+      }
     ];
   };
 
@@ -53,39 +61,7 @@ in
     }];
   };
 
-  disko.devices = let vgState = "pool_state"; in {
-    disk.hdd = {
-      device = "/dev/vda";
-      type = "disk";
-      name = "hdd";
-      content = {
-        type = "lvm_pv";
-        vg = vgState;
-      };
-    };
-
-    lvm_vg."${vgState}" = {
-      type = "lvm_vg";
-      lvs = {
-        home = {
-          size = "500M";
-          content = {
-            type = "filesystem";
-            format = "xfs";
-            mountpoint = "/home";
-          };
-        };
-        var = {
-          size = "100%FREE";
-          content = {
-            type = "filesystem";
-            format = "xfs";
-            mountpoint = "/var";
-          };
-        };
-      };
-    };
-  };
+  disko.devices = mkLayout { };
 
   networking.firewall.allowedTCPPorts = [ 80 443 ];
 

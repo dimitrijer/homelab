@@ -52,7 +52,7 @@ in
             };
             password = mkOption {
               type = types.str;
-              description = "Hashed RAPI password (echo 'user:password' | openssl md5)";
+              description = "Hashed RAPI password (echo 'user:Ganeti Remote API:password' | openssl md5)";
             };
             readonly = mkOption {
               type = types.bool;
@@ -229,6 +229,8 @@ in
               cat - <<EOF
               ${rapiUsers}
               EOF >/var/lib/ganeti/rapi/users
+
+              chown gnt-rapi:gnt-masterd /var/lib/ganeti/rapi/users
 
               ${addNodesCmd}
             '';
