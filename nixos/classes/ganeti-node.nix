@@ -11,6 +11,7 @@ in
     ../modules/common.nix
     ../modules/provisioning/disks.nix
     ../modules/ganeti.nix
+    ../modules/prometheus-ganeti-exporter.nix
   ];
 
   config =
@@ -51,6 +52,18 @@ in
         };
         initialMasterNode = "aleph";
         osProviders = [ pkgs.ganeti-os-pxe ];
+        rapiUsers = [
+          {
+            user = "prometheus-ganeti-exporter";
+            password = "0274833ae7ceb9be03abae36726ed487";
+            readonly = true;
+          }
+        ];
+      };
+
+      services.prometheus.exporters.ganeti = {
+        enable = true;
+        settings.ganeti.api = "https://gnt.homelab.tel:5080";
       };
 
       boot.kernelParams = [

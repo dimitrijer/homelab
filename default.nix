@@ -54,16 +54,16 @@ let
       inherit sources system;
       overlays = [ drbdOverlay qemuOverlay ghcOverlay ];
     };
-  ganeti = pkgs-21-11.callPackage ./ganeti/default.nix { };
-  ganeti-os-providers = import ./ganeti/os-providers/default.nix { pkgs = pkgs-unstable; };
+  ganeti = pkgs-21-11.callPackage ./ganeti { };
+  ganeti-os-providers = import ./ganeti/os-providers { pkgs = pkgs-unstable; };
+  prometheus-ganeti-exporter = pkgs-unstable.callPackage ./ganeti/prometheus-exporter { };
   pkgs =
     let
-      ganetiOverlay = self: super: { inherit ganeti; };
-      osProvidersOverlay = self: super: ganeti-os-providers;
+      ganetiOverlay = self: super: ganeti-os-providers // { inherit ganeti prometheus-ganeti-exporter; };
     in
     import sources.nixpkgs {
       inherit system;
-      overlays = [ ganetiOverlay osProvidersOverlay qemuOverlay ];
+      overlays = [ ganetiOverlay qemuOverlay ];
     };
   netbuildClasses = import ./nixos/default.nix {
     inherit pkgs;

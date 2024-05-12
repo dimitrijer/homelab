@@ -42,6 +42,26 @@ in
       type = types.listOf (types.enum (mapAttrsToList (name: user: name) config.users.users));
       default = [ ];
     };
+    rapiUsers = mkOption
+      {
+        type = types.listOf (types.submodule {
+          options = {
+            user = mkOption {
+              type = types.str;
+              description = "RAPI user";
+            };
+            password = mkOption {
+              type = types.str;
+              description = "Hashed RAPI password (echo 'user:password' | openssl md5)";
+            };
+            readonly = mkOption {
+              type = types.bool;
+              default = true;
+            };
+          };
+        });
+        default = [ ];
+      };
     vgName = mkOption {
       type = types.str;
       default = "xenvg";
@@ -157,6 +177,13 @@ in
               ({ name, node }:
                 "echo \"Adding ${node.hostname} to cluster...\" && ${pkgs.ganeti.out}/bin/gnt-node add ${node.hostname}.${cfg.domain}")
               nonMasterNodes);
+          rapiUsers = concatLines (map
+            ({ user
+             , password
+             , readonly
+             }:
+              "${user} {HA1}${password} ${if readonly then "read" else "read,write"}")
+            cfg.rapiUsers);
           setupClusterScript = pkgs.writeShellScriptBin
             "gnt-setup-cluster"
             ''
@@ -197,6 +224,11 @@ in
                 >/var/lib/ganeti/known_hosts <<EOF
               ${knownHosts}
               EOF
+
+              echo "Configuring RAPI users..."
+              cat - <<EOF
+              ${rapiUsers}
+              EOF >/var/lib/ganeti/rapi/users
 
               ${addNodesCmd}
             '';
