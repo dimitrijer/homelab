@@ -1,20 +1,20 @@
-{ pkgs, config, lib, modulesPath, disko, ... }:
+{ config, ... }:
 
 let
   mkLayout = (import ../layouts).mkLayout;
+  dataDir = "/var/lib/grafana";
   domain = "metrics.homelab.tel";
 in
 {
   imports = [
     ../modules/common-vm.nix
-    ../modules/cert.nix
-    ../modules/provisioning/keys.nix
+    ../modules/acme-nginx-reverse-proxy.nix
     ../modules/provisioning/disks.nix
   ];
 
   services.grafana = {
+    inherit dataDir;
     enable = true;
-    dataDir = "/var/lib/grafana";
     settings = {
       server = {
         inherit domain;
@@ -51,7 +51,6 @@ in
     ];
   };
 
-  provisioning.keys.enable = true;
   provisioning.disks = {
     enable = true;
     ensureDirs = [{
@@ -63,31 +62,11 @@ in
 
   disko.devices = mkLayout { };
 
-  networking.firewall.allowedTCPPorts = [ 80 443 ];
-
-  security.acme.certs."${domain}" = { group = "nginx"; };
-
-  systemd.services."acme-${domain}" = {
-    after = [ "agenix-install-secrets.service" ];
-    requires = [ "agenix-install-secrets.service" ];
-  };
-
-  services.nginx = {
+  services.acme-nginx-reverse-proxy = {
     enable = true;
-    recommendedProxySettings = true;
-    recommendedTlsSettings = true;
-
-    virtualHosts."metrics" = {
-      rejectSSL = true;
-      locations."/".return = "301 https://${domain}$request_uri";
-    };
-    virtualHosts."${domain}" = {
-      forceSSL = true;
-      useACMEHost = "${domain}";
-      locations."/" = {
-        proxyPass = "http://${config.services.grafana.settings.server.http_addr}:${toString config.services.grafana.settings.server.http_port}";
-        proxyWebsockets = true;
-      };
-    };
+    inherit domain;
+    redirectDomains = [ "metrics" "grafana" ];
+    upstreamAddress = config.services.grafana.settings.server.http_addr;
+    upstreamPort = config.services.grafana.settings.server.http_port;
   };
 }

@@ -1,54 +1,35 @@
-{ config, pkgs, modulesPath, ... }:
+{ config, ... }:
 
 let
-  musicDir = "/data/music";
   mkLayout = (import ../layouts).mkLayout;
+  musicDir = "/var/lib/navidrome-music";
 in
 {
   imports = [
     ../modules/common-vm.nix
-    ../modules/cert.nix
-    ../modules/provisioning/keys.nix
+    ../modules/acme-nginx-reverse-proxy.nix
     ../modules/provisioning/disks.nix
-    (modulesPath + "/services/audio/navidrome.nix")
   ];
 
-  config =
-    {
-      provisioning.keys.enable = true;
-      provisioning.disks.enable = true;
-      provisioning.disks.ensureDirs = [ musicDir ];
+  provisioning.disks = {
+    enable = true;
+    ensureDirs = [{
+      path = musicDir;
+    }];
+  };
 
-      disko.devices = mkLayout { };
+  disko.devices = mkLayout { };
 
-      services.navidrome = {
-        enable = true;
-        package = pkgs.navidrome;
-        settings.MusicFolder = musicDir;
-        openFirewall = false;
-      };
+  services.navidrome = {
+    enable = true;
+    settings.MusicFolder = musicDir;
+    openFirewall = false;
+  };
 
-      networking.firewall.allowedTCPPorts = [ 80 443 ];
-
-      security.acme.certs."navidrome.homelab.tel" = { group = "nginx"; };
-      systemd.services."acme-navidrome.homelab.tel".after = [ "agenix-install-secrets.service" ];
-      systemd.services."acme-navidrome.homelab.tel".requires = [ "agenix-install-secrets.service" ];
-
-      services.nginx = {
-        enable = true;
-        recommendedProxySettings = true;
-        recommendedTlsSettings = true;
-        virtualHosts."navidrome" = {
-          rejectSSL = true;
-          locations."/".return = "301 https://navidrome.homelab.tel$request_uri";
-        };
-        virtualHosts."navidrome.homelab.tel" = {
-          forceSSL = true;
-          useACMEHost = "navidrome.homelab.tel";
-          locations."/" = {
-            proxyPass = "http://127.0.0.1:${toString config.services.navidrome.settings.Port}";
-          };
-        };
-      };
-    };
+  services.acme-nginx-reverse-proxy = {
+    enable = true;
+    domain = "navidrome.homelab.tel";
+    redirectDomains = [ "navidrome" ];
+    upstreamPort = config.services.navidrome.settings.Port;
+  };
 }
