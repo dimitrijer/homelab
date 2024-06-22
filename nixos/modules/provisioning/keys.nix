@@ -10,7 +10,7 @@ in
     enable = mkEnableOption "enable provisioning of root and host keys";
     baseUrl = mkOption {
       type = types.str;
-      default = "http://10.1.100.1/keys/";
+      default = "/keys/";
     };
   };
 
@@ -21,7 +21,7 @@ in
       wants = [ "network-online.target" ];
       before = [ ] ++ lib.optionals config.services.openssh.enable [ "sshd.service" ];
 
-      path = with pkgs; [ coreutils curl openssh gnutar gzip ];
+      path = with pkgs; [ coreutils curl openssh gnutar gzip gawk iproute ];
       script = ''
         set -eu -o pipefail
 
@@ -36,7 +36,8 @@ in
           trap "rm -rf $target_dir" EXIT
           cd $target_dir
 
-          curl -sLO ${cfg.baseUrl}/$HOSTNAME.tar.gz
+          gw=$(ip route show 0.0.0.0/0 | awk '{ print $3 '})
+          curl -sLO "http://$gw${cfg.baseUrl}/$HOSTNAME.tar.gz"
           umask 077
           tar -xzvf $HOSTNAME.tar.gz
           cp host_privkey $host_key_path

@@ -1,4 +1,4 @@
-{ pkgs, config, lib, modulesPath, disko, ... }:
+{ pkgs, config, lib, modulesPath, ... }:
 
 let
   hddDevice = "/dev/sda";
