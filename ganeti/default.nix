@@ -1,6 +1,6 @@
 { lib
 , stdenv
-, fetchurl
+, fetchgit
 , autoreconfHook
 , makeWrapper
 , breakpointHook
@@ -28,6 +28,7 @@
 , graphviz
 , qemu-utils # for ovfimport
 , qemu
+, glibcLocales
 , buildDocs ? true
 }:
 
@@ -88,10 +89,12 @@ in
 stdenv.mkDerivation
 rec {
   pname = "ganeti";
-  version = "3.0.2";
-  src = fetchurl {
-    url = "https://github.com/ganeti/ganeti/releases/download/v3.0.2/ganeti-3.0.2.tar.gz";
-    hash = "sha256-l/Myy5qkSiWGLf/Bozcb+M8mZlvN44cl/y5xOWG1DoE=";
+  version = "unstable-2024-07-26";
+  src = fetchgit {
+    url = "https://github.com/ganeti/ganeti.git";
+    rev = "6c452f3a0525fb7a7aaba941891597f25fdabe88";
+    hash = "sha256-aC2uUvqawVN8FC08CbBtuSeMU2QrChnrgmvAtIkVSG8=";
+    leaveDotGit = true; # We should really manually create the version vsc file.
   };
 
   nativeBuildInputs = [
@@ -100,6 +103,7 @@ rec {
     makeWrapper
     fakeroot # for tests requiring fakeroot
     coreutils
+    glibcLocales
   ];
 
   nativeCheckInputs = [
@@ -142,12 +146,8 @@ rec {
 
   patches = [
     # patches from https://github.com/jfut/ganeti-rpm
-    ./ganeti-3.0.0-disable-start-rate-limit.patch
     ./ganeti-2.16.1-fix-new-cluster-node-certificates.patch
-    ./ganeti-3.0.0-systemd-ambient-capabilities.patch
     ./ganeti-3.0.0-qemu-migrate-set-parameters-version-check.patch
-    ./ganeti-3.0.0-ensure-dirs-fix-missing-log-files.patch
-    ./ganeti-3.0.0-ensure-dirs-add-lock-status-files.patch
     ./ganeti-3.0.2-cryptonite-version.patch
     ./ganeti-3.0.2-kvm-qmp-timeout.patch
 

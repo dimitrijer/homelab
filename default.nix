@@ -72,5 +72,6 @@ let
   };
 in
 {
+  inherit ganeti ganeti-os-providers;
   nginx = import ./nginx/default.nix { pkgs = pkgs.pkgsCross.aarch64-multiplatform; };
 } // netbuildClasses

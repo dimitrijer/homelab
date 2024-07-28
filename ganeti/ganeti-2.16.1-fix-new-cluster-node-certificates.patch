@@ -1,7 +1,8 @@
-diff -urN ganeti-2.16.1.default/lib/client/gnt_cluster.py ganeti-2.16.1/lib/client/gnt_cluster.py
---- ganeti-2.16.1.default/lib/client/gnt_cluster.py	2019-04-01 15:29:37.000000000 +0900
-+++ ganeti-2.16.1/lib/client/gnt_cluster.py	2019-04-17 15:28:17.705714498 +0900
-@@ -1163,12 +1163,6 @@
+diff --git a/lib/client/gnt_cluster.py b/lib/client/gnt_cluster.py
+index c2e4e7f56..696eb02ee 100644
+--- a/lib/client/gnt_cluster.py
++++ b/lib/client/gnt_cluster.py
+@@ -1169,12 +1169,6 @@ def _RenewCrypto(new_cluster_cert, new_rapi_cert, # pylint: disable=R0911
        ctx.ssh.CopyFileToNode(node_name, port,
                               ssconf_master_candidate_certs_filename)
  
