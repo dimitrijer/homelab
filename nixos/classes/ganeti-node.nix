@@ -5,6 +5,10 @@ let
   nvmeDevice = "/dev/nvme0n1";
   vgGaneti = "pool_gnt";
   vgHost = "pool_host";
+  prometheusExporterUser = {
+    user = "prometheus-ganeti-exporter";
+    password = "0274833ae7ceb9be03abae36726ed487";
+  };
 in
 {
   imports = [
@@ -54,8 +58,7 @@ in
         osProviders = [ pkgs.ganeti-os-pxe ];
         rapiUsers = [
           {
-            user = "prometheus-ganeti-exporter";
-            password = "0274833ae7ceb9be03abae36726ed487";
+            inherit (prometheusExporterUser) user password;
             readonly = true;
           }
         ];
@@ -64,6 +67,8 @@ in
       services.prometheus.exporters.ganeti = {
         enable = true;
         settings.ganeti.api = "https://127.0.0.1:5080";
+        settings.ganeti.user = prometheusExporterUser.user;
+        settings.ganeti.password = prometheusExporterUser.password;
       };
 
       boot.kernelParams = [
