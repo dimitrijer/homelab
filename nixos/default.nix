@@ -29,6 +29,8 @@ let
                 config.installer.cloneConfigIncludes = modules;
                 config.nixpkgs.pkgs = lib.mkDefault pkgs;
                 config.nixpkgs.localSystem = lib.mkDefault stdenv.hostPlatform;
+                # Do not require signatures, to allow copying derivations and closures from local store.
+                config.nix.settings.require-sigs = false;
               })
           ];
           system = null;

@@ -43,6 +43,16 @@ let
     # Luckily, drbd-utils 9+ supports drbd kernel module 8.4
     drbd = pkgs-unstable.drbd;
   };
+  ovmfOverlay = self: super: {
+    OVMF = pkgs-unstable.OVMF.override {
+      secureBoot = true;
+      tpmSupport = true;
+      tlsSupport = true;
+      httpSupport = true;
+      msVarsTemplate = true;
+      systemManagementModeRequired = false;
+    };
+  };
   pkgs-21-11 =
     let
       ghcOverlay = self: super: {
@@ -52,18 +62,31 @@ let
     in
     import ./nix/default.nix {
       inherit sources system;
-      overlays = [ drbdOverlay qemuOverlay ghcOverlay ];
+      overlays = [ drbdOverlay qemuOverlay ghcOverlay ovmfOverlay ];
     };
   ganeti = pkgs-21-11.callPackage ./ganeti { };
   ganeti-os-providers = import ./ganeti/os-providers { pkgs = pkgs-unstable; };
   prometheus-ganeti-exporter = pkgs-unstable.callPackage ./ganeti/prometheus-exporter { };
   pkgs =
     let
-      ganetiOverlay = self: super: ganeti-os-providers // { inherit ganeti prometheus-ganeti-exporter; };
+      ganetiOverlay = self: super: ganeti-os-providers // {
+        inherit ganeti prometheus-ganeti-exporter;
+      };
+      swtpmOverlay = self: super: {
+        swtpm = pkgs-unstable.swtpm.overrideAttrs {
+          version = "0.9.0";
+          src = pkgs-unstable.fetchFromGitHub {
+            owner = "stefanberger";
+            repo = "swtpm";
+            rev = "v0.9.0";
+            hash = "sha256-IeFrS67qStklaTgM0d3F8Xt8upm2kEawT0ZPFD7JKnk=";
+          };
+        };
+      };
     in
     import sources.nixpkgs {
       inherit system;
-      overlays = [ ganetiOverlay qemuOverlay ];
+      overlays = [ ganetiOverlay qemuOverlay swtpmOverlay ];
     };
   netbuildClasses = import ./nixos/default.nix {
     inherit pkgs;
@@ -73,5 +96,7 @@ let
 in
 {
   inherit ganeti ganeti-os-providers;
+  OVMF = pkgs-21-11.OVMF;
+  swtpm = pkgs.swtpm;
   nginx = import ./nginx/default.nix { pkgs = pkgs.pkgsCross.aarch64-multiplatform; };
 } // netbuildClasses

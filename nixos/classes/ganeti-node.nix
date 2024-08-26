@@ -187,6 +187,7 @@ in
           man-pages-posix
           dig
           vim
+          swtpm # for TPM support
         ];
     };
 }

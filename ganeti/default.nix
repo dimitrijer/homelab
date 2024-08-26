@@ -29,6 +29,7 @@
 , qemu-utils # for ovfimport
 , qemu
 , glibcLocales
+, OVMF # for UEFI boot / SecureBoot
 , buildDocs ? true
 }:
 
@@ -132,6 +133,7 @@ rec {
     multipath-tools
     systemd
     drbd
+    OVMF
   ];
 
   buildInputs = [
