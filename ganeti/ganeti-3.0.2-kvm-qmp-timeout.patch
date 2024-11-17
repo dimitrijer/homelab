@@ -1,12 +1,13 @@
-diff -urN ganeti-3.0.2.default/lib/hypervisor/hv_kvm/monitor.py ganeti-3.0.2/lib/hypervisor/hv_kvm/monitor.py
---- ganeti-3.0.2.default/lib/hypervisor/hv_kvm/monitor.py	2022-03-01 05:37:07.000000000 +0900
-+++ ganeti-3.0.2/lib/hypervisor/hv_kvm/monitor.py	2022-09-24 13:43:13.353854856 +0900
-@@ -128,7 +128,7 @@
+diff --git a/lib/hypervisor/hv_kvm/monitor.py b/lib/hypervisor/hv_kvm/monitor.py
+index 5ceca3e69..aca2a60f7 100644
+--- a/lib/hypervisor/hv_kvm/monitor.py
++++ b/lib/hypervisor/hv_kvm/monitor.py
+@@ -345,7 +345,7 @@ class QmpConnection(QemuMonitorSocket):
+   """Connection to the QEMU Monitor using the QEMU Monitor Protocol (QMP).
  
- 
- class MonitorSocket(object):
--  _SOCKET_TIMEOUT = 5
-+  _SOCKET_TIMEOUT = 15
- 
-   def __init__(self, monitor_filename):
-     """Instantiates the MonitorSocket object.
+   """
+-  _QMP_TIMEOUT = 5
++  _QMP_TIMEOUT = 15
+   _FIRST_MESSAGE_KEY = "QMP"
+   _RETURN_KEY = "return"
+   _ACTUAL_KEY = ACTUAL_KEY = "actual"

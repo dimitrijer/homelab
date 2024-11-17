@@ -36,9 +36,6 @@ in
     };
   };
 
-  # Calibre requires some graphical stuff.
-  environment.noXlibs = false;
-
   services.acme-nginx-reverse-proxy = {
     enable = true;
     domain = "calibre.homelab.tel";

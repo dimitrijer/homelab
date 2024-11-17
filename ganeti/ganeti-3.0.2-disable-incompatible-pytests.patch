@@ -1,7 +1,7 @@
-diff --git a/test/py/ganeti.hooks_unittest.py b/test/py/ganeti.hooks_unittest.py
+diff --git a/test/py/legacy/ganeti.hooks_unittest.py b/test/py/legacy/ganeti.hooks_unittest.py
 index 6e4ebcacd..bcc8df99c 100755
---- a/test/py/ganeti.hooks_unittest.py
-+++ b/test/py/ganeti.hooks_unittest.py
+--- a/test/py/legacy/ganeti.hooks_unittest.py
++++ b/test/py/legacy/ganeti.hooks_unittest.py
 @@ -139,15 +139,6 @@ class TestHooksRunner(unittest.TestCase):
        self.assertEqual(self.hr.RunHooks(self.hpath, phase, {}),
                             [(self._rname(fname), HKR_SUCCESS, "")])
@@ -53,11 +53,11 @@ index 6e4ebcacd..bcc8df99c 100755
  
  def FakeHooksRpcSuccess(node_list, hpath, phase, env):
    """Fake call_hooks_runner function.
-diff --git a/test/py/ganeti.hypervisor.hv_kvm_unittest.py b/test/py/ganeti.hypervisor.hv_kvm_unittest.py
-index 4e051215c..68cb46b78 100755
---- a/test/py/ganeti.hypervisor.hv_kvm_unittest.py
-+++ b/test/py/ganeti.hypervisor.hv_kvm_unittest.py
-@@ -448,11 +448,6 @@ class TestParameterValidation(testutils.GanetiTestCase):
+diff --git a/test/py/legacy/ganeti.hypervisor.hv_kvm_unittest.py b/test/py/legacy/ganeti.hypervisor.hv_kvm_unittest.py
+index 9111bf37e..ff70beb4d 100755
+--- a/test/py/legacy/ganeti.hypervisor.hv_kvm_unittest.py
++++ b/test/py/legacy/ganeti.hypervisor.hv_kvm_unittest.py
+@@ -340,12 +340,6 @@ class TestParameterValidation(testutils.GanetiTestCase):
  
      self.assertTrue(validation.validate_vnc_parameters(valid_data))
  
@@ -66,10 +66,11 @@ index 4e051215c..68cb46b78 100755
 -    }
 -
 -    self.assertTrue(validation.validate_vnc_parameters(valid_data))
- 
+-
    def testInvalidSecurityModelParameters(self):
      invalid_data = {
-@@ -550,14 +545,6 @@ class TestParameterValidation(testutils.GanetiTestCase):
+       constants.HV_SECURITY_MODEL: constants.HT_SM_USER,
+@@ -442,14 +436,6 @@ class TestParameterValidation(testutils.GanetiTestCase):
      self.assertTrue(validation.validate_spice_parameters(valid_data,
                                                           kvm_help_working))
  
@@ -82,12 +83,12 @@ index 4e051215c..68cb46b78 100755
 -                                                         kvm_help_working))
 -
  
- class TestDiskParameters(testutils.GanetiTestCase):
-   def testGenerateDiskAioCacheParameters(self):
-diff --git a/test/py/ganeti.utils.io_unittest-runasroot.py b/test/py/ganeti.utils.io_unittest-runasroot.py
+ class TestQmpMessage(testutils.GanetiTestCase):
+   def testSerialization(self):
+diff --git a/test/py/legacy/ganeti.utils.io_unittest-runasroot.py b/test/py/legacy/ganeti.utils.io_unittest-runasroot.py
 index 17ad1538d..e51295ebe 100644
---- a/test/py/ganeti.utils.io_unittest-runasroot.py
-+++ b/test/py/ganeti.utils.io_unittest-runasroot.py
+--- a/test/py/legacy/ganeti.utils.io_unittest-runasroot.py
++++ b/test/py/legacy/ganeti.utils.io_unittest-runasroot.py
 @@ -104,43 +104,6 @@ class TestWriteFile(testutils.GanetiTestCase):
                      keep_perms=utils.KP_IF_EXISTS)
      self.assertFileGid(target, tgid)
@@ -132,10 +133,10 @@ index 17ad1538d..e51295ebe 100644
  
  if __name__ == "__main__":
    testutils.GanetiTestProgram()
-diff --git a/test/py/ganeti.utils.process_unittest.py b/test/py/ganeti.utils.process_unittest.py
-index 1b3288ae4..f8553fab7 100755
---- a/test/py/ganeti.utils.process_unittest.py
-+++ b/test/py/ganeti.utils.process_unittest.py
+diff --git a/test/py/legacy/ganeti.utils.process_unittest.py b/test/py/legacy/ganeti.utils.process_unittest.py
+index cb5da8d8a..4d0ef745a 100755
+--- a/test/py/legacy/ganeti.utils.process_unittest.py
++++ b/test/py/legacy/ganeti.utils.process_unittest.py
 @@ -389,10 +389,10 @@ class TestRunCmd(testutils.GanetiTestCase):
        temp.write("test")
        temp.seek(0)
@@ -158,10 +159,10 @@ index 1b3288ae4..f8553fab7 100755
                                 ("cat && read -u %s; echo $REPLY" %
                                  temp.fileno())],
                                input_fd=input_file,
-diff --git a/test/py/ganeti.utils.text_unittest.py b/test/py/ganeti.utils.text_unittest.py
+diff --git a/test/py/legacy/ganeti.utils.text_unittest.py b/test/py/legacy/ganeti.utils.text_unittest.py
 index d3983e64e..f4b9c835e 100755
---- a/test/py/ganeti.utils.text_unittest.py
-+++ b/test/py/ganeti.utils.text_unittest.py
+--- a/test/py/legacy/ganeti.utils.text_unittest.py
++++ b/test/py/legacy/ganeti.utils.text_unittest.py
 @@ -498,14 +498,6 @@ class TestFormatTime(unittest.TestCase):
  
    def test(self):

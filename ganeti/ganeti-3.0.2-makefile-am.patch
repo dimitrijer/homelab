@@ -1,5 +1,5 @@
 diff --git a/Makefile.am b/Makefile.am
-index aa92d2e30..d7cafa730 100644
+index 02fd0a478..9589a568b 100644
 --- a/Makefile.am
 +++ b/Makefile.am
 @@ -23,9 +23,6 @@ comma := ,
@@ -12,31 +12,44 @@ index aa92d2e30..d7cafa730 100644
  EXTRA_DIST=
  
  # Enable colors in shelltest
-@@ -1923,7 +1920,6 @@ python_tests = \
- 	test/py/cmdlib/test_unittest.py \
- 	test/py/cfgupgrade_unittest.py \
- 	test/py/docs_unittest.py \
--	test/py/ganeti.asyncnotifier_unittest.py \
- 	test/py/ganeti.backend_unittest-runasroot.py \
- 	test/py/ganeti.backend_unittest.py \
- 	test/py/ganeti.bootstrap_unittest.py \
-@@ -1936,7 +1932,6 @@ python_tests = \
- 	test/py/ganeti.confd.client_unittest.py \
- 	test/py/ganeti.config_unittest.py \
- 	test/py/ganeti.constants_unittest.py \
--	test/py/ganeti.daemon_unittest.py \
- 	test/py/ganeti.errors_unittest.py \
- 	test/py/ganeti.hooks_unittest.py \
- 	test/py/ganeti.ht_unittest.py \
-@@ -1980,7 +1975,6 @@ python_tests = \
- 	test/py/ganeti.storage.filestorage_unittest.py \
- 	test/py/ganeti.storage.gluster_unittest.py \
- 	test/py/ganeti.tools.burnin_unittest.py \
--	test/py/ganeti.tools.ensure_dirs_unittest.py \
- 	test/py/ganeti.tools.node_daemon_setup_unittest.py \
- 	test/py/ganeti.tools.prepare_node_join_unittest.py \
- 	test/py/ganeti.uidpool_unittest.py \
-@@ -2849,9 +2843,6 @@ dist-release: dist
+@@ -1935,7 +1932,6 @@ python_tests_legacy = \
+ 	test/py/legacy/cmdlib/test_unittest.py \
+ 	test/py/legacy/cfgupgrade_unittest.py \
+ 	test/py/legacy/docs_unittest.py \
+-	test/py/legacy/ganeti.asyncnotifier_unittest.py \
+ 	test/py/legacy/ganeti.backend_unittest-runasroot.py \
+ 	test/py/legacy/ganeti.backend_unittest.py \
+ 	test/py/legacy/ganeti.bootstrap_unittest.py \
+@@ -1948,7 +1944,6 @@ python_tests_legacy = \
+ 	test/py/legacy/ganeti.confd.client_unittest.py \
+ 	test/py/legacy/ganeti.config_unittest.py \
+ 	test/py/legacy/ganeti.constants_unittest.py \
+-	test/py/legacy/ganeti.daemon_unittest.py \
+ 	test/py/legacy/ganeti.errors_unittest.py \
+ 	test/py/legacy/ganeti.hooks_unittest.py \
+ 	test/py/legacy/ganeti.ht_unittest.py \
+@@ -1992,7 +1987,6 @@ python_tests_legacy = \
+ 	test/py/legacy/ganeti.storage.filestorage_unittest.py \
+ 	test/py/legacy/ganeti.storage.gluster_unittest.py \
+ 	test/py/legacy/ganeti.tools.burnin_unittest.py \
+-	test/py/legacy/ganeti.tools.ensure_dirs_unittest.py \
+ 	test/py/legacy/ganeti.tools.node_daemon_setup_unittest.py \
+ 	test/py/legacy/ganeti.tools.prepare_node_join_unittest.py \
+ 	test/py/legacy/ganeti.uidpool_unittest.py \
+@@ -2076,10 +2070,10 @@ check_SCRIPTS += \
+ 	$(HS_BUILT_TEST_HELPERS)
+ endif
+ 
+-test/hs/hpc-htools:	src/htools
++test/hs/hpc-htools:	dist/build/htools
+ 	$(LN_S) ../../$< $@
+ 
+-test/hs/hpc-mon-collector:	src/mon-collector
++test/hs/hpc-mon-collector:	dist/build/mon-collector
+ 	$(LN_S) ../../$< $@
+ 
+ TESTS = $(dist_TESTS) $(nodist_TESTS)
+@@ -2874,9 +2868,6 @@ dist-release: dist
  	done
  
  install-exec-local:
@@ -46,7 +59,7 @@ index aa92d2e30..d7cafa730 100644
  	for dir in $(SYMLINK_TARGET_DIRS); do \
  	  @mkdir_p@  $(DESTDIR)$$dir; \
  	done
-@@ -3056,7 +3047,7 @@ ganeti.cabal: cabal/ganeti.template.cabal Makefile cabal/cabal-from-modules.py $
+@@ -3042,7 +3033,7 @@ dist/setup-config: ganeti.cabal $(HS_BUILT_SRCS)
  # Target that builds all binaries (including those that are not
  # rebuilt except when running the tests)
  .PHONY: really-all

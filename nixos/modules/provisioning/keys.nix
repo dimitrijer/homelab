@@ -21,7 +21,7 @@ in
       wants = [ "network-online.target" ];
       before = [ ] ++ lib.optionals config.services.openssh.enable [ "sshd.service" ];
 
-      path = with pkgs; [ coreutils curl openssh gnutar gzip gawk iproute ];
+      path = with pkgs; [ coreutils curl openssh gnutar gzip gawk iproute2 ];
       script = ''
         set -eu -o pipefail
 

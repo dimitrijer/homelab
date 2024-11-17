@@ -215,7 +215,7 @@ in
                   --master-netdev gnt0 \
                   --no-etc-hosts \
                   --no-ssh-init \
-                  --drbd-usermode-helper ${pkgs.coreutils.out}/bin/true \
+                  --drbd-usermode-helper /run/current-system/sw/bin/true \
                   ${cfg.clusterName}.${cfg.domain}
 
               echo "Configuring known hosts..."
@@ -250,7 +250,7 @@ in
         "drbd"
       ];
       boot.extraModprobeConfig = ''
-        options drbd minor_count=128 usermode_helper=${pkgs.coreutils.out}/bin/true
+        options drbd minor_count=128 usermode_helper=/run/current-system/sw/bin/true
       '';
 
       # User/group setup taken from tools/user-setup

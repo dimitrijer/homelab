@@ -9,7 +9,7 @@
 , coreutils
 , util-linux
 , procps
-, iproute
+, iproute2
 , socat
 , iputils
 , fping
@@ -47,6 +47,7 @@ let
         paramiko
         pyyaml # for unit tests
         mock # for unit tests
+        pytest # for unit tests
       ] ++
       lib.optionals
         buildDocs [ sphinx ]);
@@ -93,8 +94,8 @@ rec {
   version = "unstable-2024-07-26";
   src = fetchgit {
     url = "https://github.com/ganeti/ganeti.git";
-    rev = "6c452f3a0525fb7a7aaba941891597f25fdabe88";
-    hash = "sha256-aC2uUvqawVN8FC08CbBtuSeMU2QrChnrgmvAtIkVSG8=";
+    rev = "377cfd5840476ee72e91a60b2c53a42e8b7a1546";
+    hash = "sha256-u597HYGdDEAI2aElnZuOnMCnPhqKLfja+Av/anC69B0=";
     leaveDotGit = true; # We should really manually create the version vsc file.
   };
 
@@ -115,7 +116,7 @@ rec {
   ];
 
   propagatedBuildInputs = [
-    iproute
+    iproute2
     socat
     qemu-utils
     coreutils
@@ -124,7 +125,6 @@ rec {
     systemd
     gnutar
     lvm2
-    iproute
     iputils
     fping
     ndisc6
@@ -187,17 +187,18 @@ rec {
   doCheck = true;
 
   preCheck = ''
-    substituteInPlace ./test/py/ganeti.utils.process_unittest.py  \
+    substituteInPlace ./test/py/legacy/ganeti.utils.process_unittest.py  \
       --replace "[\"env\"]" "[\"${coreutils.out}/bin/env\"]"
 
-    substituteInPlace ./test/py/ganeti.hooks_unittest.py  \
+    substituteInPlace ./test/py/legacy/ganeti.hooks_unittest.py  \
       --replace "/bin/true" "${coreutils.out}/bin/true" \
       --replace "/usr/bin/env" "${coreutils.out}/bin/env" \
   '';
 
+  # Add py-tests-unit and py-tests-integration at some point.
   checkPhase = ''
     runHook preCheck
-    make hs-tests py-tests
+    make hs-tests py-tests-legacy
     runHook postCheck
   '';
 
