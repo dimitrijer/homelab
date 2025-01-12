@@ -86,7 +86,7 @@ let
     in
     import sources.nixpkgs {
       inherit system;
-      overlays = [ ganetiOverlay qemuOverlay swtpmOverlay ];
+      overlays = [ ganetiOverlay qemuOverlay swtpmOverlay ovmfOverlay ];
     };
   netbuildClasses = import ./nixos/default.nix {
     inherit pkgs;

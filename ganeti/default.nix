@@ -45,6 +45,7 @@ let
         bitarray
         psutil
         paramiko
+        libvirt
         pyyaml # for unit tests
         mock # for unit tests
         pytest # for unit tests

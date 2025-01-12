@@ -156,6 +156,19 @@ in
         (name: node: node.rootPubkey)
         cfg.nodes;
 
+      virtualisation.libvirtd = {
+        enable = true;
+        qemu = {
+          package = pkgs.qemu;
+          runAsRoot = true;
+          swtpm.enable = true;
+          ovmf = {
+            enable = true;
+            packages = [ pkgs.OVMF.fd ];
+          };
+        };
+      };
+
       environment.systemPackages =
         let
           pubkeyList = lib.attrsets.mapAttrsToList
