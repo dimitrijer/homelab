@@ -88,6 +88,7 @@ let
     ] ++ lib.optionals buildDocs [
       hscolour # hsapi documentation
     ]);
+  ganetiRev = "cb0dde503f8befd387f06ba28e703fbc716b0ac4";
 in
 stdenv.mkDerivation
 rec {
@@ -162,7 +163,11 @@ rec {
   ];
 
   preConfigure = ''
+    echo "${ganetiRev}" > vcs-version
     patchShebangs ./autotools ./daemons ./tools
+
+    substituteInPlace ./Makefile.am \
+      --replace "pytest-3" "pytest"
   '';
 
   configureFlags = [
@@ -199,7 +204,7 @@ rec {
   # Add py-tests-unit and py-tests-integration at some point.
   checkPhase = ''
     runHook preCheck
-    make hs-tests py-tests-legacy
+    make hs-tests py-tests-legacy py-tests-unit
     runHook postCheck
   '';
 
