@@ -88,7 +88,7 @@ let
     ] ++ lib.optionals buildDocs [
       hscolour # hsapi documentation
     ]);
-  ganetiRev = "cb0dde503f8befd387f06ba28e703fbc716b0ac4";
+  ganetiRev = "377cfd5840476ee72e91a60b2c53a42e8b7a1546";
 in
 stdenv.mkDerivation
 rec {
@@ -96,9 +96,8 @@ rec {
   version = "unstable-2024-07-26";
   src = fetchgit {
     url = "https://github.com/ganeti/ganeti.git";
-    rev = "377cfd5840476ee72e91a60b2c53a42e8b7a1546";
+    rev = ganetiRev;
     hash = "sha256-u597HYGdDEAI2aElnZuOnMCnPhqKLfja+Av/anC69B0=";
-    leaveDotGit = true; # We should really manually create the version vsc file.
   };
 
   nativeBuildInputs = [
