@@ -97,7 +97,7 @@ rec {
   src = fetchgit {
     url = "https://github.com/ganeti/ganeti.git";
     rev = ganetiRev;
-    hash = "sha256-u597HYGdDEAI2aElnZuOnMCnPhqKLfja+Av/anC69B0=";
+    hash = "sha256-0ExyLHG48ty4U9DTfTQn+G2A22BtJ9YKRVhdfEQWF70=";
   };
 
   nativeBuildInputs = [
