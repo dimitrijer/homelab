@@ -31,6 +31,7 @@
 , glibcLocales
 , OVMF # for UEFI boot / SecureBoot
 , buildDocs ? true
+, withLinting ? true
 }:
 
 let
@@ -51,7 +52,10 @@ let
         pytest # for unit tests
       ] ++
       lib.optionals
-        buildDocs [ sphinx ]);
+        buildDocs [ sphinx ]
+        ++
+      lib.optionals
+        withLinting [ pylint pycodecoverage ]);
   ghcWithPackages = ghc.ghcWithPackages (ps: with ps;
     [
       Cabal_3_6_2_0 # Cabal library version has to match cabal-install version
@@ -87,6 +91,8 @@ let
       test-framework-quickcheck2
     ] ++ lib.optionals buildDocs [
       hscolour # hsapi documentation
+    ] ++ lib.optionals withLinting [
+      hlint
     ]);
   ganetiRev = "377cfd5840476ee72e91a60b2c53a42e8b7a1546";
 in
@@ -201,9 +207,10 @@ rec {
   '';
 
   # Add py-tests-unit and py-tests-integration at some point.
-  checkPhase = ''
+  checkPhase = let maybeLint = if withLinting then "make lint" else ""; in ''
     runHook preCheck
     make hs-tests py-tests-legacy py-tests-unit
+    ${maybeLint}
     runHook postCheck
   '';
 
