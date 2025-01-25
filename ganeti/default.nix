@@ -30,8 +30,9 @@
 , qemu
 , glibcLocales
 , OVMF # for UEFI boot / SecureBoot
-, buildDocs ? true
+, withDocs ? true
 , withLinting ? true
+, withCoverage ? true
 }:
 
 let
@@ -52,10 +53,14 @@ let
         pytest # for unit tests
       ] ++
       lib.optionals
-        buildDocs [ sphinx ]
+        withDocs [ sphinx ]
         ++
       lib.optionals
-        withLinting [ pylint pycodecoverage ]);
+        withLinting [ pylint pycodestyle ]
+        ++
+      lib.optionals
+        withCoverage [ coverage ]
+      );
   ghcWithPackages = ghc.ghcWithPackages (ps: with ps;
     [
       Cabal_3_6_2_0 # Cabal library version has to match cabal-install version
@@ -89,7 +94,7 @@ let
       test-framework
       test-framework-hunit
       test-framework-quickcheck2
-    ] ++ lib.optionals buildDocs [
+    ] ++ lib.optionals withDocs [
       hscolour # hsapi documentation
     ] ++ lib.optionals withLinting [
       hlint
@@ -150,7 +155,7 @@ rec {
     pandoc # for man pages
     man # for man pages
   ]
-  ++ lib.optionals buildDocs [ graphviz ]
+  ++ lib.optionals withDocs [ graphviz ]
   ;
 
   patches = [
@@ -207,10 +212,14 @@ rec {
   '';
 
   # Add py-tests-unit and py-tests-integration at some point.
-  checkPhase = let maybeLint = if withLinting then "make lint" else ""; in ''
+  checkPhase = let
+        maybeLint = if withLinting then "make lint" else "";
+        maybeCoverage = if withCoverage then "make coverage" else "";
+    in ''
     runHook preCheck
     make hs-tests py-tests-legacy py-tests-unit
     ${maybeLint}
+    ${maybeCoverage}
     runHook postCheck
   '';
 
