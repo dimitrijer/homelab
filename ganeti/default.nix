@@ -54,10 +54,10 @@ let
       ] ++
       lib.optionals
         withDocs [ sphinx ]
-        ++
+      ++
       lib.optionals
         withLinting [ pylint pycodestyle ]
-        ++
+      ++
       lib.optionals
         withCoverage [ coverage ]
       );
@@ -212,16 +212,18 @@ rec {
   '';
 
   # Add py-tests-unit and py-tests-integration at some point.
-  checkPhase = let
-        maybeLint = if withLinting then "make lint" else "";
-        maybeCoverage = if withCoverage then "make coverage" else "";
-    in ''
-    runHook preCheck
-    make hs-tests py-tests-legacy py-tests-unit
-    ${maybeLint}
-    ${maybeCoverage}
-    runHook postCheck
-  '';
+  checkPhase =
+    let
+      maybeLint = if withLinting then "make lint" else "";
+      maybeCoverage = if withCoverage then "make coverage" else "";
+    in
+    ''
+      runHook preCheck
+      make hs-tests py-tests-legacy py-tests-unit
+      ${maybeLint}
+      ${maybeCoverage}
+      runHook postCheck
+    '';
 
   postFixup =
     let

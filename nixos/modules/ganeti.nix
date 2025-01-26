@@ -168,6 +168,7 @@ in
           };
         };
       };
+      systemd.sockets."libvirtd-tcp".wantedBy = [ "ganeti-noded.service" ];
 
       environment.systemPackages =
         let
