@@ -5,7 +5,7 @@
 , makeWrapper
 , breakpointHook
 , ghc
-, python3
+, python311 # asyncore was removed in 3.12
 , coreutils
 , util-linux
 , procps
@@ -31,13 +31,13 @@
 , glibcLocales
 , OVMF # for UEFI boot / SecureBoot
 , withDocs ? true
-, withLinting ? true
-, withCoverage ? true
+, withLinting ? false
+, withCoverage ? false
 }:
 
 let
   pythonWithPackages =
-    python3.withPackages
+    python311.withPackages
       (ps: with ps; [
         pyopenssl
         simplejson
@@ -63,7 +63,6 @@ let
       );
   ghcWithPackages = ghc.ghcWithPackages (ps: with ps;
     [
-      Cabal_3_6_2_0 # Cabal library version has to match cabal-install version
       cabal-install
       ps.curl
       json
@@ -99,7 +98,8 @@ let
     ] ++ lib.optionals withLinting [
       hlint
     ]);
-  ganetiRev = "377cfd5840476ee72e91a60b2c53a42e8b7a1546";
+
+  ganetiRev = "87dfc17aaa8745de47b17b402c8a3ea4901b567b";
 in
 stdenv.mkDerivation
 rec {
@@ -108,7 +108,7 @@ rec {
   src = fetchgit {
     url = "https://github.com/ganeti/ganeti.git";
     rev = ganetiRev;
-    hash = "sha256-0ExyLHG48ty4U9DTfTQn+G2A22BtJ9YKRVhdfEQWF70=";
+    hash = "sha256-yOZyXEkr1ucyhpZ/hbP/HdDmnzIee6WsZapaYy2356Q=";
   };
 
   nativeBuildInputs = [
@@ -162,7 +162,6 @@ rec {
     # patches from https://github.com/jfut/ganeti-rpm
     ./ganeti-2.16.1-fix-new-cluster-node-certificates.patch
     ./ganeti-3.0.0-qemu-migrate-set-parameters-version-check.patch
-    ./ganeti-3.0.2-cryptonite-version.patch
     ./ganeti-3.0.2-kvm-qmp-timeout.patch
 
     # nix-specific patches
@@ -170,6 +169,7 @@ rec {
     ./ganeti-3.0.2-makefile-am.patch
     ./ganeti-3.0.2-do-not-link-when-running-ssh-cmds.patch
     ./ganeti-3.0.2-disable-incompatible-pytests.patch
+    ./ganeti-3.1-bitarray-compat.patch
   ];
 
   preConfigure = ''

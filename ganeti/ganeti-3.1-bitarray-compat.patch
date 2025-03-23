@@ -1,0 +1,35 @@
+diff --git a/lib/network.py b/lib/network.py
+index 07f159a12..095632638 100644
+--- a/lib/network.py
++++ b/lib/network.py
+@@ -247,7 +247,7 @@ class AddressPool(object):
+     @raise errors.AddressPoolError: Pool is full
+ 
+     """
+-    idx = self.all_reservations.search(self.FREE, 1)
++    idx = list(self.all_reservations.search(self.FREE))
+     if idx:
+       return str(self.network[idx[0]])
+     else:
+@@ -258,7 +258,7 @@ class AddressPool(object):
+ 
+     """
+     # pylint: disable=E1103
+-    idxs = self.ext_reservations.search(self.RESERVED)
++    idxs = list(self.ext_reservations.search(self.RESERVED))
+     return [str(self.network[idx]) for idx in idxs]
+ 
+   @classmethod
+diff --git a/lib/utils/bitarrays.py b/lib/utils/bitarrays.py
+index a635eef19..dc981ae9d 100644
+--- a/lib/utils/bitarrays.py
++++ b/lib/utils/bitarrays.py
+@@ -61,7 +61,7 @@ def GetFreeSlot(slots, slot=None, reserve=False):
+       raise errors.GenericError("Slot %d occupied" % slot)
+ 
+   else:
+-    avail = slots.search(_AVAILABLE_SLOT, 1)
++    avail = list(slots.search(_AVAILABLE_SLOT))
+     if not avail:
+       raise errors.GenericError("All slots occupied")
+ 

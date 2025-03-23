@@ -36,19 +36,6 @@ index 02fd0a478..9589a568b 100644
  	test/py/legacy/ganeti.tools.node_daemon_setup_unittest.py \
  	test/py/legacy/ganeti.tools.prepare_node_join_unittest.py \
  	test/py/legacy/ganeti.uidpool_unittest.py \
-@@ -2076,10 +2070,10 @@ check_SCRIPTS += \
- 	$(HS_BUILT_TEST_HELPERS)
- endif
- 
--test/hs/hpc-htools:	src/htools
-+test/hs/hpc-htools:	dist/build/htools
- 	$(LN_S) ../../$< $@
- 
--test/hs/hpc-mon-collector:	src/mon-collector
-+test/hs/hpc-mon-collector:	dist/build/mon-collector
- 	$(LN_S) ../../$< $@
- 
- TESTS = $(dist_TESTS) $(nodist_TESTS)
 @@ -2874,9 +2868,6 @@ dist-release: dist
  	done
  
