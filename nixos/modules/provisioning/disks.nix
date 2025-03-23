@@ -37,7 +37,8 @@ in
       description = "Provision and/or mount disks";
       before = [ "local-fs.target" "systemd-journald.service" ];
       wants = [ "local-fs-pre.target" ];
-      after = [ "local-fs-pre.target" ];
+      after = [ "local-fs-pre.target" "systemd-udev-settle.service" ];
+      requires = [ "systemd-udev-settle.service" ];
 
       path = with pkgs; [ coreutils util-linux lvm2 disko-fmt disko-mnt ];
       script =
