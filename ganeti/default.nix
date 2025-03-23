@@ -170,6 +170,7 @@ rec {
     ./ganeti-3.0.2-do-not-link-when-running-ssh-cmds.patch
     ./ganeti-3.0.2-disable-incompatible-pytests.patch
     ./ganeti-3.1-bitarray-compat.patch
+    ./ganeti-3.1-do-not-reset-env-when-updating-master-ip.patch
   ];
 
   preConfigure = ''

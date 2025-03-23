@@ -1,0 +1,35 @@
+diff --git a/lib/utils/process.py b/lib/utils/process.py
+index ac2cbb128..043044114 100644
+--- a/lib/utils/process.py
++++ b/lib/utils/process.py
+@@ -145,6 +145,9 @@ def _BuildCmdEnvironment(env, reset):
+   """
+   if reset:
+     cmd_env = {}
++    # Do not reset PATH because of Nix.
++    if "PATH" in os.environ:
++      cmd_env["PATH"] = os.environ["PATH"]
+   else:
+     cmd_env = os.environ.copy()
+     cmd_env["LC_ALL"] = "C"
+diff --git a/test/py/legacy/ganeti.utils.process_unittest.py b/test/py/legacy/ganeti.utils.process_unittest.py
+index cb5da8d8a..1c0efa0ed 100755
+--- a/test/py/legacy/ganeti.utils.process_unittest.py
++++ b/test/py/legacy/ganeti.utils.process_unittest.py
+@@ -360,11 +360,11 @@ class TestRunCmd(testutils.GanetiTestCase):
+ 
+   def testResetEnv(self):
+     """Test environment reset functionality"""
+-    self.assertEqual(utils.RunCmd(["env"], reset_env=True).stdout.strip(),
+-                         "")
+-    self.assertEqual(utils.RunCmd(["env"], reset_env=True,
+-                                      env={"FOO": "bar",}).stdout.strip(),
+-                         "FOO=bar")
++    def splitLines(s):
++      return [line.strip() for line in s.splitlines() if "PATH" not in line]
++    self.assertEqual(splitLines(utils.RunCmd(["env"], reset_env=True).stdout), [])
++    self.assertEqual(splitLines(utils.RunCmd(["env"], reset_env=True, env={"FOO": "bar",}).stdout),
++                         ["FOO=bar"])
+ 
+   def testNoFork(self):
+     """Test that nofork raise an error"""
