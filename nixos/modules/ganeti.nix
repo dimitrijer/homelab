@@ -93,15 +93,10 @@ in
             "${cfg.primaryInterface}" = {
               name = "${cfg.primaryInterface}";
             };
-            gnt0 = {
-              name = "gnt0";
-              type = "internal";
-            };
           };
         };
         interfaces = {
           "${cfg.primaryInterface}".useDHCP = false;
-          gnt0.useDHCP = false;
           br0.useDHCP = true;
         };
         search = [ cfg.domain ];
@@ -226,7 +221,7 @@ in
                   --disk-parameters 'drbd:metavg=${cfg.vgName}' \
                   --vg-name ${cfg.vgName} \
                   --nic-parameters 'mode=openvswitch,link=br0' \
-                  --master-netdev gnt0 \
+                  --master-netdev br0 \
                   --no-etc-hosts \
                   --no-ssh-init \
                   --drbd-usermode-helper /run/current-system/sw/bin/true \
