@@ -17,10 +17,10 @@
         "homepage": "",
         "owner": "nix-community",
         "repo": "disko",
-        "rev": "d57058eb09dd5ec00c746df34fe0a603ea744370",
-        "sha256": "0l9v6ilvi1dwilvx8xifnf8p775z2kbdhkbprqpxm6firjsapgsv",
+        "rev": "0d8c6ad4a43906d14abd5c60e0ffe7b587b213de",
+        "sha256": "0mwnd7vfyd2wqbrvlpjgxng83fp97lg1ihzzx9ipbj5c9l0bjgjm",
         "type": "tarball",
-        "url": "https://github.com/nix-community/disko/archive/d57058eb09dd5ec00c746df34fe0a603ea744370.tar.gz",
+        "url": "https://github.com/nix-community/disko/archive/0d8c6ad4a43906d14abd5c60e0ffe7b587b213de.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixfiles": {
