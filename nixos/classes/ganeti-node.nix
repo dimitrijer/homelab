@@ -78,6 +78,10 @@ in
         "apm=off"
         "pcie_aspm=off"
       ];
+      boot.extraModulePackages = with config.boot.kernelPackages; [
+        drbd
+      ];
+
 
       systemd.services."serial-getty@ttyS1" = {
         enable = true;
