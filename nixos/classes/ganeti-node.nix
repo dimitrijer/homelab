@@ -188,6 +188,14 @@ in
           dig
           vim
           swtpm # for TPM support
+          vdo # for vdoformat
         ];
+
+      system.activationScripts.vdoSetup = {
+        deps = [ "specialfs" ];
+        text = ''
+          ln -sf ${pkgs.vdo}/bin/vdoformat /usr/bin/vdoformat
+        '';
+      };
     };
 }

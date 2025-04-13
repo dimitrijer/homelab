@@ -257,6 +257,7 @@ in
       boot.kernelModules = [
         "kvm-intel"
         "drbd"
+        "dm_vdo"
       ];
       boot.extraModprobeConfig = ''
         options drbd minor_count=128 usermode_helper=/run/current-system/sw/bin/true
