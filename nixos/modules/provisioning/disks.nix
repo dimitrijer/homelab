@@ -55,6 +55,11 @@ in
         ''
           set -eu -o pipefail
 
+          if ! grep -q "homelab.provision_disks=true" /proc/cmdline; then
+            echo "No provision disks found in kernel cmdline, exiting..."
+            exit 0
+          fi
+
           echo "Waiting for disks to settle..."
           sleep 5
 
