@@ -55,20 +55,14 @@ in
         ''
           set -eu -o pipefail
 
-          if ! grep -q "homelab.provision_disks=true" /proc/cmdline; then
-            echo "No provision disks found in kernel cmdline, exiting..."
-            exit 0
-          fi
-
           echo "Waiting for disks to settle..."
           sleep 5
 
           echo "Scanning for VGs..."
           vgscan
 
-          if ! vgs ${vgsList} -o name --noheadings 2>&1 >/dev/null
-          then
-            echo "Could not detect VGs, will provision disks..."
+          if grep -q "homelab.provision_disks=true" /proc/cmdline; then
+            echo "Preparing to provision disks, as indicated by the kernel cmdline..."
 
             for vg in $(vgs --noheadings -o name --rows)
             do
@@ -92,7 +86,7 @@ in
             echo "Provisioning disks..."
             disko-fmt
           else
-            echo "VGs detected, skipping provisioning..."
+            echo "No provision disks found in kernel cmdline, will NOT provision disks..."
           fi
 
           echo "Mounting local disks..."
