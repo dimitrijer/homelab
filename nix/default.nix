@@ -4,6 +4,10 @@
 , system ? "x86_64-linux"
 }:
 
-import sources.nixpkgs-21-11 {
-  inherit config system overlays;
+let
+  finalOverlays = import ./overlays { inherit overlays; };
+in
+import sources.nixpkgs {
+  inherit config system;
+  overlays = finalOverlays;
 }
