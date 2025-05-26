@@ -24,7 +24,6 @@
 , openssh
 , drbd
 , man
-, pandoc-cli
 , graphviz
 , qemu-utils # for ovfimport
 , qemu
@@ -95,6 +94,7 @@ let
       test-framework-quickcheck2
     ] ++ lib.optionals withDocs [
       hscolour # hsapi documentation
+      pandoc-cli # for rst -> man generation
     ] ++ lib.optionals withLinting [
       hlint
     ]);
@@ -152,7 +152,6 @@ rec {
     curl
     pythonWithPackages
     ghcWithPackages
-    pandoc-cli # for man pages
     man # for man pages
   ]
   ++ lib.optionals withDocs [ graphviz ]
