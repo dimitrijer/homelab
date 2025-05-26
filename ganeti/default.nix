@@ -24,7 +24,7 @@
 , openssh
 , drbd
 , man
-, pandoc
+, pandoc-cli
 , graphviz
 , qemu-utils # for ovfimport
 , qemu
@@ -152,7 +152,7 @@ rec {
     curl
     pythonWithPackages
     ghcWithPackages
-    pandoc # for man pages
+    pandoc-cli # for man pages
     man # for man pages
   ]
   ++ lib.optionals withDocs [ graphviz ]
@@ -171,6 +171,7 @@ rec {
     ./ganeti-3.0.2-disable-incompatible-pytests.patch
     ./ganeti-3.1-bitarray-compat.patch
     ./ganeti-3.1-do-not-reset-env-when-updating-master-ip.patch
+    ./ganeti-3.1-pandoc-3.6-man-rst.patch
   ];
 
   preConfigure = ''

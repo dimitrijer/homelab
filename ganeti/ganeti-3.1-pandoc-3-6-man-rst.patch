@@ -1,0 +1,26 @@
+diff --git a/man/ganeti.rst b/man/ganeti.rst
+index d3b37e84e..038cc860e 100644
+--- a/man/ganeti.rst
++++ b/man/ganeti.rst
+@@ -307,7 +307,7 @@ Defaults
+ For certain commands you can use environment variables to provide
+ default command line arguments. Just assign the arguments as a string to
+ the corresponding environment variable. The format of that variable
+-name is **binary**_*command*. **binary** is the name of the ``gnt-*``
++name is **binary_command**. **binary** is the name of the ``gnt-*``
+ script all upper case and dashes replaced by underscores, and *command*
+ is the command invoked on that script.
+ 
+diff --git a/man/gnt-instance.rst b/man/gnt-instance.rst
+index aab49d8ee..658872635 100644
+--- a/man/gnt-instance.rst
++++ b/man/gnt-instance.rst
+@@ -775,7 +775,7 @@ cpu\_mask
+     this form, the list of VCPU mappings is given as a colon (:)
+     separated list, whose elements are the possible values for the
+     second or first form above. In this form, the number of elements in
+-    the colon-separated list _must_ equal the number of VCPUs of the
++    the colon-separated list must equal the number of VCPUs of the
+     instance.
+ 
+     Example:
