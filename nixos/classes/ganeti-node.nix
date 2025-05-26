@@ -79,7 +79,7 @@ in
         "pcie_aspm=off"
       ];
       boot.extraModulePackages = with config.boot.kernelPackages; [
-        drbd
+        #drbd - DRBD9
       ];
 
 
