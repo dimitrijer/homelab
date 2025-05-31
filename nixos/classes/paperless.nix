@@ -30,9 +30,6 @@ in
     passwordFile = config.age.secrets.paperless-admin-password.path;
   };
 
-  # Paperless requires some graphical stuff.
-  environment.noXlibs = false;
-
   age.secrets.paperless-admin-password =
     {
       file = ../secrets/paperless-admin-password.age;
