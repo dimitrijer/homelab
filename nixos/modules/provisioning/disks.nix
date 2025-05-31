@@ -39,8 +39,19 @@ in
       wants = [ "local-fs-pre.target" ];
       after = [ "local-fs-pre.target" "systemd-udev-settle.service" ];
       requires = [ "systemd-udev-settle.service" ];
-
-      path = with pkgs; [ coreutils util-linux lvm2 disko-fmt disko-mnt ];
+      serviceConfig = {
+        "StandardOutput" = "file:/dev/kmsg";
+        "StandardError" = "file:/dev/kmsg";
+      };
+      path = with pkgs; [
+        coreutils
+        gnugrep
+        util-linux
+        lvm2
+        disko-fmt
+        disko-mnt
+        kmod # for modprobe
+      ];
       script =
         let
           blockDevs = lib.attrsets.mapAttrsToList (key: value: value.content.device) config.disko.devices.disk;
@@ -61,7 +72,8 @@ in
           echo "Scanning for VGs..."
           vgscan
 
-          if grep -q "homelab.provision_disks=true" /proc/cmdline; then
+          if grep -q "homelab.provision_disks=true" /proc/cmdline
+          then
             echo "Preparing to provision disks, as indicated by the kernel cmdline..."
 
             for vg in $(vgs --noheadings -o name --rows)
