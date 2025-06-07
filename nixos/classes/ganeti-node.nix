@@ -201,5 +201,16 @@ in
           ln -sf ${pkgs.vdo}/bin/vdoformat /usr/bin/vdoformat
         '';
       };
+
+      # Recommended by Ganeti setup: prevent LVM from automatically scanning
+      # DRBD devices for PV/VG/LV signatures. Note that this overwrites
+      # `lvm.conf`, which is empty by default, unless you use snapshots, thin
+      # volumes etc.
+      # (see https://docs.ganeti.org/docs/ganeti/3.0/html/install.html#id24).
+      environment.etc."/lvm/lvm.conf".text = lib.mkForce ''
+        devices {
+          filter = ["r|/dev/drbd[0-9]+|"]
+        }
+      '';
     };
 }
