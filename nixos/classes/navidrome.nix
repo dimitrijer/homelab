@@ -15,6 +15,9 @@ in
     enable = true;
     ensureDirs = [{
       path = musicDir;
+      owner = "navidrome";
+      group = "users";
+      mod = 775;
     }];
   };
 
