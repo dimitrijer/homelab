@@ -266,7 +266,10 @@ in
       # User/group setup taken from tools/user-setup
       users.extraGroups = {
         "gnt-luxid" = { };
-        "gnt-daemons" = { };
+        "gnt-daemons" = {
+          # Admin users need to be able to connect to UNIX domain sockets.
+          members = cfg.adminUsers;
+        };
         "gnt-admin" = {
           members = cfg.adminUsers;
         };
