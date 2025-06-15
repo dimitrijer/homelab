@@ -28,6 +28,9 @@ in
     port = 8080;
     consumptionDirIsPublic = true;
     passwordFile = config.age.secrets.paperless-admin-password.path;
+    settings = {
+      PAPERLESS_URL = "https://paperless.homelab.tel";
+    };
   };
 
   age.secrets.paperless-admin-password =
