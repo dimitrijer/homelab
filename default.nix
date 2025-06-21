@@ -14,7 +14,7 @@ let
     in
     import ./nixos/default.nix {
       # Expose ganeti in pkgs.
-      pkgs = import sources.nixpkgs {
+      pkgs = import ./nix {
         inherit system;
         overlays = [ ganetiOverlay ];
       };
