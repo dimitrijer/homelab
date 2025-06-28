@@ -193,6 +193,7 @@ in
           vim
           swtpm # for TPM support
           vdo # for vdoformat
+          qemu
         ];
 
       system.activationScripts.vdoSetup = {

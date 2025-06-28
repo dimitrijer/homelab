@@ -36,7 +36,7 @@ in
           trap "rm -rf $target_dir" EXIT
           cd $target_dir
 
-          gw=$(ip route show 0.0.0.0/0 | awk '{ print $3 '})
+          gw=$(ip route show 0.0.0.0/0 table main | awk '{ print $3 '})
           curl -sLO "http://$gw${cfg.baseUrl}/$HOSTNAME.tar.gz"
           umask 077
           tar -xzvf $HOSTNAME.tar.gz

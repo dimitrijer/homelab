@@ -72,6 +72,11 @@ in
       default = "eth0";
       description = "primary interface name (uplink)";
     };
+    secondaryInterface = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = "secondary interface name (drbd)";
+    };
     osProviders = mkOption {
       type = types.listOf types.package;
     };
@@ -88,6 +93,16 @@ in
       virtualisation.vswitch.enable = true;
       networking = {
         useDHCP = false;
+        useNetworkd = cfg.secondaryInterface != null;
+        # Define custom routing tables
+        iproute2 = mkIf (cfg.secondaryInterface != null) {
+          enable = true;
+          rttablesExtraConfig = ''
+            100 drbd
+            101 homelab
+          '';
+        };
+
         vswitches = {
           br0.interfaces = {
             "${cfg.primaryInterface}" = {
@@ -98,7 +113,12 @@ in
         interfaces = {
           "${cfg.primaryInterface}".useDHCP = false;
           br0.useDHCP = true;
+        } // lib.optionalAttrs (cfg.secondaryInterface != null) {
+          "${cfg.secondaryInterface}" = {
+            useDHCP = true;
+          };
         };
+
         search = [ cfg.domain ];
         firewall = mkIf config.networking.firewall.enable {
           allowedTCPPorts = [
@@ -140,6 +160,95 @@ in
           );
       };
 
+      systemd.network = mkIf (cfg.secondaryInterface != null) {
+        enable = true;
+        wait-online.ignoredInterfaces = [ "${cfg.primaryInterface}" ];
+        # Configuration for enp3s0 (VLAN 97 interface)
+        networks."10-enp3s0" = {
+          matchConfig.Name = "enp3s0";
+          networkConfig = {
+            DHCP = "yes";
+            # Keep existing routes in main table for compatibility
+            KeepConfiguration = "no";
+          };
+
+          # Routes for vlan97 table
+          routes = [
+            {
+              routeConfig = {
+                Destination = "10.1.97.0/24";
+                Table = 100;
+              };
+            }
+            {
+              routeConfig = {
+                Gateway = "10.1.97.1";
+                Table = 100;
+              };
+            }
+          ];
+
+          # Routing policy rules for vlan97 table
+          routingPolicyRules = [
+            {
+              routingPolicyRuleConfig = {
+                From = "10.1.97.5";
+                Table = 100;
+                Priority = 100;
+              };
+            }
+            {
+              routingPolicyRuleConfig = {
+                To = "10.1.97.0/24";
+                Table = 100;
+                Priority = 102;
+              };
+            }
+          ];
+        };
+        # Configuration for br0 (homelab bridge interface)
+        networks."20-br0" = {
+          matchConfig.Name = "br0";
+          networkConfig = {
+            DHCP = "yes";
+            KeepConfiguration = "no";
+          };
+
+          # Routes for homelab table
+          routes = [
+            {
+              routeConfig = {
+                Destination = "10.1.100.0/24";
+                Table = 101;
+              };
+            }
+            {
+              routeConfig = {
+                Gateway = "10.1.100.1";
+                Table = 101;
+              };
+            }
+          ];
+
+          # Routing policy rules for homelab table
+          routingPolicyRules = [
+            {
+              routingPolicyRuleConfig = {
+                From = "10.1.100.5";
+                Table = 101;
+                Priority = 101;
+              };
+            }
+            {
+              routingPolicyRuleConfig = {
+                To = "10.1.100.0/24";
+                Table = 101;
+                Priority = 103;
+              };
+            }
+          ];
+        };
+      };
       services.openssh = {
         settings.PermitRootLogin = "yes";
       };
