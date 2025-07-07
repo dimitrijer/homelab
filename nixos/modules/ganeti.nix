@@ -30,6 +30,10 @@ in
           options = {
             hostname = mkOption { type = types.str; };
             address = mkOption { type = types.str; };
+            secondaryAddress = mkOption {
+              type = types.nullOr types.str;
+              default = null;
+            };
             rootPubkey = mkOption { type = types.str; };
             hostPubkey = mkOption { type = types.str; };
           };
@@ -175,34 +179,26 @@ in
           # Routes for vlan97 table
           routes = [
             {
-              routeConfig = {
-                Destination = "10.1.97.0/24";
-                Table = 100;
-              };
+              Destination = "10.1.97.0/24";
+              Table = 100;
             }
             {
-              routeConfig = {
-                Gateway = "10.1.97.1";
-                Table = 100;
-              };
+              Gateway = "10.1.97.1";
+              Table = 100;
             }
           ];
 
           # Routing policy rules for vlan97 table
           routingPolicyRules = [
             {
-              routingPolicyRuleConfig = {
-                From = "10.1.97.5";
-                Table = 100;
-                Priority = 100;
-              };
+              From = "10.1.97.0/24";
+              Table = 100;
+              Priority = 100;
             }
             {
-              routingPolicyRuleConfig = {
-                To = "10.1.97.0/24";
-                Table = 100;
-                Priority = 102;
-              };
+              To = "10.1.97.0/24";
+              Table = 100;
+              Priority = 102;
             }
           ];
         };
@@ -217,34 +213,26 @@ in
           # Routes for homelab table
           routes = [
             {
-              routeConfig = {
-                Destination = "10.1.100.0/24";
-                Table = 101;
-              };
+              Destination = "10.1.100.0/24";
+              Table = 101;
             }
             {
-              routeConfig = {
-                Gateway = "10.1.100.1";
-                Table = 101;
-              };
+              Gateway = "10.1.100.1";
+              Table = 101;
             }
           ];
 
           # Routing policy rules for homelab table
           routingPolicyRules = [
             {
-              routingPolicyRuleConfig = {
-                From = "10.1.100.5";
-                Table = 101;
-                Priority = 101;
-              };
+              From = "10.1.100.0/24";
+              Table = 101;
+              Priority = 101;
             }
             {
-              routingPolicyRuleConfig = {
-                To = "10.1.100.0/24";
-                Table = 101;
-                Priority = 103;
-              };
+              To = "10.1.100.0/24";
+              Table = 101;
+              Priority = 103;
             }
           ];
         };
@@ -302,6 +290,7 @@ in
              }:
               "${user} {HA1}${password} ${if readonly then "read" else "read,write"}")
             cfg.rapiUsers);
+          # TODO: init with secondary IP, if available (-s).
           setupClusterScript = pkgs.writeShellScriptBin
             "gnt-setup-cluster"
             ''
