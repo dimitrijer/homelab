@@ -10,7 +10,7 @@ in
     enable = mkEnableOption "enable provisioning of root and host keys";
     baseUrl = mkOption {
       type = types.str;
-      default = "/keys/";
+      default = "/keys";
     };
   };
 
@@ -36,8 +36,7 @@ in
           trap "rm -rf $target_dir" EXIT
           cd $target_dir
 
-          gw=$(ip route show 0.0.0.0/0 table main | awk '{ print $3 '})
-          curl -sLO "http://$gw${cfg.baseUrl}/$HOSTNAME.tar.gz"
+          curl -sLO "http://boot.homelab.tel${cfg.baseUrl}/$HOSTNAME.tar.gz"
           umask 077
           tar -xzvf $HOSTNAME.tar.gz
           cp host_privkey $host_key_path

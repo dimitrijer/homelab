@@ -3,7 +3,7 @@
 let
   lib = pkgs.lib;
   stdenv = pkgs.stdenv;
-  deployHost = "10.1.100.1";
+  deployHost = "boot.homelab.tel";
   deployUser = "admin";
   deployPath = "/usb1-part1/http/nixos/by-class/";
 
