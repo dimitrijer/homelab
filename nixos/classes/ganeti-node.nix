@@ -103,6 +103,7 @@ in
       };
 
       services.fwupd.enable = true;
+      services.fstrim.enable = true;
 
       disko.devices = {
         disk = {
@@ -199,6 +200,13 @@ in
           swtpm # for TPM support
           vdo # for vdoformat
           qemu
+          iftop
+          sysstat # iostat, sar
+          pciutils # lspci
+          smartmontools # smartctl
+          nvme-cli
+          fio
+          stress-ng
         ];
 
       system.activationScripts.vdoSetup = {
