@@ -98,4 +98,10 @@ in
       ./classes/paperless.nix
     ];
   };
+  audiobookshelf = mkNetbuild {
+    className = "audiobookshelf";
+    modules = [
+      ./classes/audiobookshelf.nix
+    ];
+  };
 }

@@ -61,6 +61,7 @@
       vim
       inetutils
       dig
+      rsync
     ];
 
   services.prometheus.exporters.node = {
