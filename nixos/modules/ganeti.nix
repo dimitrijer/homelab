@@ -84,6 +84,10 @@ in
     osProviders = mkOption {
       type = types.listOf types.package;
     };
+    libvirtEnabled = mkOption {
+      type = types.bool;
+      default = false;
+    };
   };
 
   config =
@@ -248,7 +252,7 @@ in
         (name: node: node.rootPubkey)
         cfg.nodes;
 
-      virtualisation.libvirtd = {
+      virtualisation.libvirtd = mkIf cfg.libvirtEnabled {
         enable = true;
         qemu = {
           package = pkgs.qemu;
@@ -260,7 +264,9 @@ in
           };
         };
       };
-      systemd.sockets."libvirtd-tcp".wantedBy = [ "ganeti-noded.service" ];
+      systemd.sockets = mkIf cfg.libvirtEnabled {
+        "libvirtd-tcp".wantedBy = [ "ganeti-noded.service" ];
+      };
 
       environment.systemPackages =
         let
