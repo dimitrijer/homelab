@@ -35,6 +35,12 @@ in
       type = types.ints.positive;
       description = "port of server to proxy";
     };
+
+    extraConfig = mkOption {
+      type = types.str;
+      description = "additional nginx config to include for virtual host location";
+      default = "";
+    };
   };
 
   config = mkIf cfg.enable {
