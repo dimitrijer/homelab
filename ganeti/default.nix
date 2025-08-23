@@ -99,7 +99,7 @@ let
       hlint
     ]);
 
-  ganetiRev = "0e3c749d657bf375041506a14d555fdd2894ea29";
+  ganetiRev = "fbd4e11f12a8fd67b46fdcc1d767843983795bba";
 in
 stdenv.mkDerivation
 rec {
