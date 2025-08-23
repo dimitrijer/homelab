@@ -79,9 +79,6 @@ in
       boot.kernelParams = [
         "console=tty0"
         "console=ttyS1,19200" # serial over LAN
-        # The following two _should_ help with e1000e NIC auto-negotiation issue.
-        "apm=off"
-        "pcie_aspm=off"
       ];
       boot.extraModulePackages = with config.boot.kernelPackages; [
         #drbd - DRBD9
