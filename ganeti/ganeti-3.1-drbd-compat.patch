@@ -13,3 +13,45 @@ index 19d7e90d6..712b4ea25 100644
  
      if version["k_minor"] <= 3:
        self._show_info_cls = drbd_info.DRBD83ShowInfo
+diff --git a/lib/storage/drbd_info.py b/lib/storage/drbd_info.py
+index d033e5365..ed499393c 100644
+--- a/lib/storage/drbd_info.py
++++ b/lib/storage/drbd_info.py
+@@ -165,7 +165,7 @@ class DRBD8Info(object):
+ 
+   """
+ 
+-  _VERSION_RE = re.compile(r"^version: (\d+)\.(\d+)\.(\d+)(?:([.-])(\d+))?"
++  _VERSION_RE = re.compile(r"^version: (\d+)\.(\d+)\.(\d+)(?:([.-])?((?:rc\.)?\d+))?"
+                            r" \(api:(\d+)/proto:(\d+)(?:-(\d+))?\)")
+   _VALID_LINE_RE = re.compile("^ *([0-9]+): cs:([^ ]+).*$")
+ 
+diff --git a/test/py/legacy/ganeti.storage.drbd_unittest.py b/test/py/legacy/ganeti.storage.drbd_unittest.py
+index da2827042..5302dff53 100755
+--- a/test/py/legacy/ganeti.storage.drbd_unittest.py
++++ b/test/py/legacy/ganeti.storage.drbd_unittest.py
+@@ -51,6 +51,7 @@ class TestDRBD8(testutils.GanetiTestCase):
+       "version: 8.2.7 (api:88/proto:0-100)",
+       "version: 8.3.7.49 (api:188/proto:13-191)",
+       "version: 8.4.8-1 (api:1/proto:86-101)",
++      "version: 9.2.15-rc.1 (api:2/proto:118-123)",
+     ]
+     result = [
+       {
+@@ -95,6 +96,16 @@ class TestDRBD8(testutils.GanetiTestCase):
+         "api": 1,
+         "proto": 86,
+         "proto2": "101",
++      },
++      {
++        "k_major": 9,
++        "k_minor": 2,
++        "k_point": 15,
++        "k_fix_separator": "-",
++        "k_fix": "rc.1",
++        "api": 2,
++        "proto": 118,
++        "proto2": "123",
+       }
+     ]
+     for d, r in zip(data, result):
