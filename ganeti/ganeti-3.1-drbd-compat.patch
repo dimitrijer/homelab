@@ -1,0 +1,15 @@
+diff --git a/lib/storage/drbd.py b/lib/storage/drbd.py
+index 19d7e90d6..712b4ea25 100644
+--- a/lib/storage/drbd.py
++++ b/lib/storage/drbd.py
+@@ -213,10 +213,6 @@ class DRBD8Dev(base.BlockDev):
+ 
+     info = DRBD8.GetProcInfo()
+     version = info.GetVersion()
+-    if version["k_major"] != 8:
+-      base.ThrowError("Mismatch in DRBD kernel version and requested ganeti"
+-                      " usage: kernel is %s.%s, ganeti wants 8.x",
+-                      version["k_major"], version["k_minor"])
+ 
+     if version["k_minor"] <= 3:
+       self._show_info_cls = drbd_info.DRBD83ShowInfo

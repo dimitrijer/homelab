@@ -76,14 +76,26 @@ in
         settings.ganeti.password = prometheusExporterUser.password;
       };
 
-      boot.kernelParams = [
-        "console=tty0"
-        "console=ttyS1,19200" # serial over LAN
-      ];
-      boot.extraModulePackages = with config.boot.kernelPackages; [
-        #drbd - DRBD9
-      ];
-
+      boot = {
+        kernelParams = [
+          "console=tty0"
+          "console=ttyS1,19200" # serial over LAN
+        ];
+        # TCP optimizations from https://linbit.com/blog/independent-performance-testing-of-drbd-by-e4/.
+        kernel.sysctl = {
+          "net.ipv4.tcp_slow_start_after_idle" = 0;
+          "net.core.rmem_max" = 56623104;
+          "net.core.wmem_max" = 56623104;
+          "net.core.rmem_default" = 56623104;
+          "net.core.wmem_default" = 56623104;
+          "net.core.optmem_max" = 56623104;
+          "net.ipv4.tcp_rmem" = "4096 87380 56623104";
+          "net.ipv4.tcp_wmem" = "4096 65536 56623104";
+        };
+        extraModulePackages = with config.boot.kernelPackages; [
+          drbd # DRBD 9.x
+        ];
+      };
 
       systemd.services."serial-getty@ttyS1" = {
         enable = true;
