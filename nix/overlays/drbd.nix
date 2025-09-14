@@ -8,7 +8,7 @@ self: super: {
             url = "https://pkg.linbit.com/downloads/drbd/9/drbd-${version}.tar.gz";
             hash = "sha256-67bjS6CK4zrW1suIxMO4na3vFT8Xpzbw095b0/8WhUY=";
           };
-          makeFlags = oldAttrs.makeFlags ++ [ "CONFIG_DBRD_COMPAT_84=true" ];
+          makeFlags = oldAttrs.makeFlags ++ [ "CONFIG_DRBD_COMPAT_84=y" ];
         });
     });
   drbd = super.drbd.overrideAttrs

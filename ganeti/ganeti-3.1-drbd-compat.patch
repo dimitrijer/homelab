@@ -1,7 +1,16 @@
 diff --git a/lib/storage/drbd.py b/lib/storage/drbd.py
-index 19d7e90d6..712b4ea25 100644
+index 19d7e90d6..a2d06f98e 100644
 --- a/lib/storage/drbd.py
 +++ b/lib/storage/drbd.py
+@@ -138,7 +138,7 @@ class DRBD8(object):
+ 
+     """
+     version = info.GetVersion()
+-    if version["k_minor"] <= 3:
++    if version["k_major"] == 8 and version["k_minor"] <= 3:
+       return drbd_cmdgen.DRBD83CmdGenerator(version)
+     else:
+       return drbd_cmdgen.DRBD84CmdGenerator(version)
 @@ -213,10 +213,6 @@ class DRBD8Dev(base.BlockDev):
  
      info = DRBD8.GetProcInfo()
@@ -13,6 +22,28 @@ index 19d7e90d6..712b4ea25 100644
  
      if version["k_minor"] <= 3:
        self._show_info_cls = drbd_info.DRBD83ShowInfo
+diff --git a/lib/storage/drbd_cmdgen.py b/lib/storage/drbd_cmdgen.py
+index 62e291e5c..54d20e107 100644
+--- a/lib/storage/drbd_cmdgen.py
++++ b/lib/storage/drbd_cmdgen.py
+@@ -243,13 +243,15 @@ class DRBD83CmdGenerator(BaseDRBDCmdGenerator):
+ 
+     # The following code assumes DRBD 8.x, with x < 4 and x != 1 (DRBD 8.1.x
+     # does not exist)
+-    if not vmaj == 8 and vmin in (0, 2, 3):
++    if not ((vmaj == 8 and vmin in (0, 2, 3)) or
++            (vmaj == 9 and vmin == 2 and vrel == 15)):
+       raise errors.BlockDeviceError("Unsupported DRBD version: %d.%d.%d" %
+                                     (vmaj, vmin, vrel))
+ 
+     def _AppendOrRaise(option, min_version):
+       """Helper for DRBD options"""
+-      if min_version is not None and vrel >= min_version:
++      if (vmaj == 8 and min_version is not None and vrel >= min_version) or \
++          vmaj == 9:
+         args.append(option)
+       else:
+         raise errors.BlockDeviceError("Could not use the option %s as the"
 diff --git a/lib/storage/drbd_info.py b/lib/storage/drbd_info.py
 index d033e5365..ed499393c 100644
 --- a/lib/storage/drbd_info.py
