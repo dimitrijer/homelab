@@ -15,6 +15,7 @@ in
     ../modules/common.nix
     ../modules/provisioning/disks.nix
     ../modules/ganeti.nix
+    ../modules/ovn.nix
     ../modules/prometheus-ganeti-exporter.nix
   ];
 
@@ -69,6 +70,9 @@ in
         ];
       };
 
+      virtualisation.ovn.enable = true;
+      virtualisation.ovn.withNorthd = true;
+
       services.prometheus.exporters.ganeti = {
         enable = true;
         settings.ganeti.api = "https://127.0.0.1:5080";
@@ -93,7 +97,7 @@ in
           "net.ipv4.tcp_wmem" = "4096 65536 56623104";
         };
         extraModulePackages = with config.boot.kernelPackages; [
-          drbd # DRBD 9.x
+          #drbd # DRBD 9.x
         ];
       };
 

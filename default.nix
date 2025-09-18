@@ -2,7 +2,8 @@
 
 let
   pkgs = import ./nix { inherit system; };
-  ganeti = pkgs.callPackage ./ganeti { };
+  ovn = pkgs.callPackage ./ovn { };
+  ganeti = pkgs.callPackage ./ganeti { openvswitch = ovn; };
   ganeti-os-providers = import ./ganeti/os-providers { inherit pkgs; };
   prometheus-ganeti-exporter = pkgs.callPackage ./ganeti/prometheus-exporter { };
   netbuildClasses =
@@ -11,18 +12,21 @@ let
       ganetiOverlay = self: super: ganeti-os-providers // {
         inherit ganeti prometheus-ganeti-exporter;
       };
+      ovnOverlay = self: super: {
+        inherit ovn;
+      };
     in
     import ./nixos/default.nix {
       # Expose ganeti in pkgs.
       pkgs = import ./nix {
         inherit system;
-        overlays = [ ganetiOverlay ];
+        overlays = [ ganetiOverlay ovnOverlay ];
       };
       disko = sources.disko;
       agenix = sources.agenix;
     };
 in
 {
-  inherit ganeti ganeti-os-providers;
+  inherit ovn ganeti ganeti-os-providers;
   nginx = import ./nginx/default.nix { pkgs = pkgs.pkgsCross.aarch64-multiplatform; };
 } // netbuildClasses
