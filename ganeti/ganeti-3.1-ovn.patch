@@ -1,0 +1,12 @@
+diff --git a/tools/net-common.in b/tools/net-common.in
+index dacca411a..6238a6a3a 100644
+--- a/tools/net-common.in
++++ b/tools/net-common.in
+@@ -173,6 +173,7 @@ function setup_ovs {
+     TRUNKS=${TRUNKS#:}  # remove leading ':', if still present
+     [ -n "$TRUNKS" ] && ovs-vsctl set port $INTERFACE trunks=${TRUNKS//:/,}
+ 
++    ovs-vsctl set interface $INTERFACE external-ids:iface-id="$INSTANCE"
+   fi
+ }
+ 

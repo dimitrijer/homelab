@@ -23,6 +23,7 @@
 , perl
 , util-linux
 , which
+, gawk
 }:
 
 stdenv.mkDerivation rec {
@@ -107,6 +108,7 @@ stdenv.mkDerivation rec {
     runHook postInstall
   '';
 
+  # TODO: gawk missing from share/ovn/scripts/ovn-lib AND share/openvswitch/scripts/ovs-lib
   postInstall = ''
     mkdir -vp $out/share/openvswitch/scripts
     mkdir -vp $out/etc/ovn

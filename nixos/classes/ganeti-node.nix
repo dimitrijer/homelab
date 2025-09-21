@@ -70,8 +70,11 @@ in
         ];
       };
 
-      virtualisation.ovn.enable = true;
-      virtualisation.ovn.withNorthd = true;
+      virtualisation.ovn = {
+        enable = true;
+        openFirewall = true;
+      };
+      systemd.services.ovn-northd.unitConfig.ConditionHost = "dalet";
 
       services.prometheus.exporters.ganeti = {
         enable = true;
@@ -208,6 +211,8 @@ in
           linux-manual
           man-pages
           man-pages-posix
+          nettools # arp
+          arping
           dig
           vim
           swtpm # for TPM support
