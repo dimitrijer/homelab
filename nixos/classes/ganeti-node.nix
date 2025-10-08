@@ -225,6 +225,8 @@ in
           nvme-cli
           fio
           stress-ng
+          tcpdump
+          lsof
         ];
 
       system.activationScripts.vdoSetup = {
