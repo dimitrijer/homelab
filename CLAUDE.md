@@ -2,6 +2,27 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Repository Overview
+
+**Purpose**: NixOS-based homelab infrastructure with PXE network booting for virtualized and physical machines.
+
+**Infrastructure**:
+- 4-node Ganeti cluster (aleph, bet, gimel, dalet)
+- Hardware: Dell Optiplex Micro 7040
+- Network boot via iPXE
+- Storage: DRBD for replication, LVM for volume management
+- Domain: `homelab.tel`
+
+**Key Technologies**:
+- **NixOS**: Base operating system and image builder
+- **Ganeti 3.x**: Cluster management and VM orchestration
+- **KVM/QEMU**: Virtualization
+- **DRBD 9.x**: Distributed replicated block device
+- **OVN**: Open Virtual Network for SDN
+- **disko**: Declarative disk partitioning
+- **agenix**: Age-encrypted secrets management
+- **niv**: Nix dependency management
+
 ## Build System
 
 This is a Nix-based project using traditional `nix-build` (not flakes). All builds are pure and reproducible.
@@ -66,6 +87,29 @@ Tests run during build via `checkPhase`:
 
 ## Architecture
 
+### Network Configuration
+
+- **Primary Interface** (`enp0s31f6`): Uplink to 10.1.100.0/24
+  - Node IPs: .2 (aleph), .3 (bet), .4 (gimel), .5 (dalet)
+  - Cluster IP: .254 (floating)
+  - Router: .1 (MikroTik)
+
+- **Secondary Interface** (`enp3s0`): DRBD replication 10.1.97.0/24
+  - Node IPs: .2, .3, .4, .5 (same hostname mapping)
+
+VMs use Ganeti-managed networking (OVN or bridged).
+
+Serial console on all physical nodes: `ttyS1` at 19200 baud (Serial over LAN).
+
+### Storage Layout
+
+- **VG pool_gnt**: Ganeti VM storage (NVMe SSD /dev/nvme0n1)
+- **VG pool_host**: Host storage (HDD /dev/sda)
+  - swap: 32G
+  - home: 100G
+  - var: remaining space
+- **Boot partition**: 100M EFI on HDD
+
 ### The Build Pipeline
 
 1. **Entry Point** (`default.nix`):
@@ -119,6 +163,61 @@ self: super: {
 - Check kernel cmdline for `homelab.provision_disks=true` before formatting
 - Always mount existing disks regardless of provisioning flag
 - Create directories from `ensureDirs` option after mounting
+
+## Directory Structure
+
+```
+.
+├── default.nix                 # Main entry point, builds all targets
+├── ganeti/                     # Ganeti derivation and components
+│   ├── default.nix            # Ganeti 3.x package with custom patches
+│   ├── *.patch                # Compatibility and feature patches
+│   ├── os-providers/          # Ganeti OS providers
+│   │   └── ganeti-os-pxe.nix # PXE boot OS provider
+│   └── prometheus-exporter/   # Ganeti metrics exporter
+├── ipxe/
+│   └── netboot.ipxe           # Main iPXE boot menu script
+├── netboot.ipxe               # Root iPXE script (symlink or copy)
+├── nix/
+│   ├── sources.json           # niv-managed dependencies
+│   ├── sources.nix            # niv fetcher implementation
+│   ├── default.nix            # nixpkgs with overlays
+│   └── overlays/              # Custom package overlays
+│       ├── default.nix        # Overlay aggregator
+│       ├── qemu.nix           # QEMU with custom iPXE ROM
+│       ├── drbd.nix           # DRBD 9.x kernel module
+│       ├── ovmf.nix           # UEFI firmware
+│       └── ghc.nix            # GHC for Ganeti
+├── nginx/
+│   └── default.nix            # nginx container for MikroTik router
+├── nixos/
+│   ├── default.nix            # mkNetbuild function and class definitions
+│   ├── classes/               # NixOS image configurations
+│   │   ├── ganeti-node.nix   # Physical cluster node image
+│   │   ├── navidrome.nix     # Music streaming service
+│   │   ├── calibre-web.nix   # eBook server
+│   │   ├── paperless.nix     # Document management
+│   │   ├── audiobookshelf.nix# Audiobook server
+│   │   └── metrics.nix       # Prometheus/Grafana monitoring
+│   ├── modules/               # Reusable NixOS modules
+│   │   ├── common.nix        # Base configuration for all images
+│   │   ├── common-vm.nix     # Base configuration for VMs
+│   │   ├── ganeti.nix        # Ganeti cluster module
+│   │   ├── ovn.nix           # OVN networking module
+│   │   ├── acme-nginx-reverse-proxy.nix  # ACME + nginx
+│   │   ├── prometheus-ganeti-exporter.nix
+│   │   └── provisioning/
+│   │       ├── disks.nix     # Disk provisioning with disko
+│   │       └── keys.nix      # SSH key provisioning
+│   ├── layouts/
+│   │   └── default.nix       # Disko disk layouts for VMs
+│   └── secrets/
+│       └── secrets.nix       # Agenix secrets configuration
+├── ovn/
+│   └── default.nix            # OVN package with OVS
+└── initrd/
+    └── default.nix            # Custom initrd components
+```
 
 ## Critical Dependencies and Constraints
 
@@ -211,9 +310,9 @@ niv update nixpkgs -r abc123def
 
 Current pinned dependencies (`nix/sources.json`):
 - **nixpkgs**: nixpkgs-unstable (for latest QEMU, DRBD)
-- **disko**: For declarative disk management
+- **disko**: Disk partitioning (nix-community)
 - **agenix**: Custom fork `dimitrijer/agenix-as-oneshot-service` for oneshot secret provisioning
-- **nixfiles**: Reference to personal nixfiles (informational)
+- **nixfiles**: Personal nixfiles reference
 
 When updating nixpkgs:
 1. Check Python 3.11 availability
@@ -368,22 +467,6 @@ disko.devices = (import ../layouts).mkLayout {
 ```
 
 For physical nodes, disk layout is directly in `nixos/classes/ganeti-node.nix` (complex with LVM PVs on both NVMe and HDD).
-
-## Network Configuration
-
-Physical nodes have dual network interfaces:
-
-- **Primary** (`enp0s31f6`): Uplink to 10.1.100.0/24
-  - Node IPs: .2 (aleph), .3 (bet), .4 (gimel), .5 (dalet)
-  - Cluster IP: .254 (floating)
-  - Router: .1 (MikroTik)
-
-- **Secondary** (`enp3s0`): DRBD replication 10.1.97.0/24
-  - Node IPs: .2, .3, .4, .5 (same hostname mapping)
-
-VMs use Ganeti-managed networking (OVN or bridged).
-
-Serial console on all physical nodes: `ttyS1` at 19200 baud (Serial over LAN).
 
 ## Boot and Provisioning Flow
 
@@ -544,19 +627,22 @@ nix-build -v
 nix-build --option substitute false
 ```
 
-## Working with Git
+### Troubleshooting Boot Issues
 
-Current uncommitted changes (as of last snapshot):
-- Modified: `ganeti/ganeti-3.1-drbd-compat.patch`
-- Modified: `nix/overlays/qemu.nix`
-- Modified: `nixos/classes/ganeti-node.nix`
-- Modified: `nixos/classes/navidrome.nix`
-- Untracked: `initrd/`, `netboot.ipxe`, `nix/overlays/pxe-virtio.rom`
+**iPXE Problems**:
+- Check iPXE menu timeout (5000ms default)
+- Verify boot server reachability: `curl http://boot.homelab.tel`
+- Check MAC-based routing: `/usb1-part1/http/nixos/by-mac/{mac}/ipxe`
 
-When committing:
-1. Group related changes (e.g., "Update DRBD to 9.2.15" includes drbd.nix + compat patch)
-2. Test build before committing: `nix-build -A ganeti-node.netbuild`
-3. For Ganeti changes, run tests: `nix-build -A ganeti`
+**Provisioning Issues**:
+- Verify kernel cmdline for `homelab.provision_disks=true`
+- Check disko device paths match actual hardware
+- Review systemd logs: `journalctl -u provision-disks`
+
+**Key Issues**:
+- Ensure `{hostname}.tar.gz` exists on boot server
+- Check network connectivity before key download
+- Verify service ordering: keys before sshd
 
 ## OVN Networking
 
@@ -599,6 +685,37 @@ boot.kernel.sysctl = {
 ```
 
 These are from [LINBIT's DRBD performance testing](https://linbit.com/blog/independent-performance-testing-of-drbd-by-e4/). Do not modify without benchmarking.
+
+## Quick Reference
+
+### Important File Locations
+
+| Task | File(s) |
+|------|---------|
+| Add Ganeti patch | `ganeti/default.nix`, `ganeti/*.patch` |
+| Add service class | `nixos/classes/*.nix`, `nixos/default.nix` |
+| Modify base config | `nixos/modules/common.nix` |
+| Change disk layout | `nixos/layouts/default.nix` |
+| Update dependencies | `niv update` (modifies `nix/sources.json`) |
+| Customize QEMU | `nix/overlays/qemu.nix` |
+| Change boot menu | `ipxe/netboot.ipxe` |
+| Manage secrets | `nixos/secrets/secrets.nix` |
+| Add node to cluster | `nixos/classes/ganeti-node.nix` (nodes attr) |
+
+### Codebase Metrics
+
+**Total Lines of Nix Code**: ~938 lines across all .nix files
+
+**Complexity Distribution**:
+- Simple: Service classes (navidrome, calibre-web) - ~40 lines each
+- Medium: Modules (provisioning, ovn) - ~100-150 lines
+- Complex: ganeti.nix, ganeti-node.nix - ~280-600 lines
+
+**Key Patterns**:
+1. **Module Pattern**: Options + mkIf config blocks
+2. **Overlay Pattern**: self/super for package overrides
+3. **Provisioning Pattern**: systemd oneshot services
+4. **Class Pattern**: imports + disko + service config
 
 ## References
 
