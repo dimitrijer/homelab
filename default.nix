@@ -3,6 +3,8 @@
 let
   pkgs = import ./nix { inherit system; };
   ovn = pkgs.callPackage ./ovn { };
+  openstackPythonPackages = import ./openstack { inherit pkgs; };
+  ovn-bgp-agent = pkgs.callPackage ./ovn-bgp-agent { inherit openstackPythonPackages; };
   ganeti = pkgs.callPackage ./ganeti { openvswitch = ovn; };
   ganeti-os-providers = import ./ganeti/os-providers { inherit pkgs; };
   prometheus-ganeti-exporter = pkgs.callPackage ./ganeti/prometheus-exporter { };
@@ -27,6 +29,6 @@ let
     };
 in
 {
-  inherit ovn ganeti ganeti-os-providers;
+  inherit ovn ovn-bgp-agent ganeti ganeti-os-providers;
   nginx = import ./nginx/default.nix { pkgs = pkgs.pkgsCross.aarch64-multiplatform; };
 } // netbuildClasses
