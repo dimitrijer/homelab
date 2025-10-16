@@ -3,6 +3,10 @@
 , fetchFromGitHub
 , setuptools
 , pbr
+, stestr
+, oslotest
+, testtools
+, testscenarios
 }:
 
 buildPythonPackage rec {
@@ -25,7 +29,19 @@ buildPythonPackage rec {
     pbr
   ];
 
-  doCheck = false;
+  nativeCheckInputs = [
+    stestr
+    oslotest
+    testtools
+    testscenarios
+  ];
+
+  checkPhase = ''
+    runHook preCheck
+    stestr run
+    runHook postCheck
+  '';
+
   pythonImportsCheck = [ "os_traits" ];
 
   meta = with lib; {

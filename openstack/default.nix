@@ -16,6 +16,8 @@ let
     inherit (python.pkgs) amqp bcrypt cachetools cffi debtcollector eventlet fixtures greenlet jinja2 iso8601;
     inherit (python.pkgs) kombu msgpack ncclient netaddr paste pastedeploy prettytable pyyaml requests routes;
     inherit (python.pkgs) setproctitle sortedcontainers statsd yappi;
+    # Test dependencies
+    inherit (python.pkgs) stestr oslotest testtools testscenarios requests-mock jsonschema testresources hacking confluent-kafka;
   });
 
   self = {

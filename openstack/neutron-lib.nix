@@ -25,6 +25,13 @@
 , stevedore
 , webob
 , oslo-service
+, stestr
+, oslotest
+, testtools
+, testscenarios
+, fixtures
+, testresources
+, hacking
 }:
 
 buildPythonPackage rec {
@@ -72,7 +79,22 @@ buildPythonPackage rec {
     oslo-service
   ];
 
-  doCheck = false;
+  nativeCheckInputs = [
+    stestr
+    oslotest
+    testtools
+    testscenarios
+    fixtures
+    testresources
+    hacking
+  ];
+
+  checkPhase = ''
+    runHook preCheck
+    stestr run
+    runHook postCheck
+  '';
+
   pythonImportsCheck = [ "neutron_lib" ];
 
   meta = with lib; {

@@ -11,6 +11,11 @@
 , pyyaml
 , requests
 , stevedore
+, stestr
+, oslotest
+, requests-mock
+, sphinx
+, docutils
 }:
 
 buildPythonPackage rec {
@@ -44,7 +49,20 @@ buildPythonPackage rec {
     stevedore
   ];
 
-  doCheck = false;
+  nativeCheckInputs = [
+    stestr
+    oslotest
+    requests-mock
+    sphinx
+    docutils
+  ];
+
+  checkPhase = ''
+    runHook preCheck
+    stestr run
+    runHook postCheck
+  '';
+
   pythonImportsCheck = [ "oslo_policy" ];
 
   meta = with lib; {

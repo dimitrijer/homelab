@@ -15,6 +15,11 @@
 , webob
 , yappi
 , oslo-privsep
+, stestr
+, oslotest
+, fixtures
+, requests
+, futurist
 }:
 
 buildPythonPackage rec {
@@ -52,7 +57,17 @@ buildPythonPackage rec {
     oslo-privsep
   ];
 
+  nativeCheckInputs = [
+    stestr
+    oslotest
+    fixtures
+    requests
+    futurist
+  ];
+
+  # Tests require cotyledon which is not in nixpkgs
   doCheck = false;
+
   pythonImportsCheck = [ "oslo_service" ];
 
   meta = with lib; {

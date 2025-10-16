@@ -10,6 +10,9 @@
 , eventlet
 , greenlet
 , msgpack
+, stestr
+, oslotest
+, fixtures
 }:
 
 buildPythonPackage rec {
@@ -42,7 +45,18 @@ buildPythonPackage rec {
     msgpack
   ];
 
-  doCheck = false;
+  nativeCheckInputs = [
+    stestr
+    oslotest
+    fixtures
+  ];
+
+  checkPhase = ''
+    runHook preCheck
+    stestr run
+    runHook postCheck
+  '';
+
   pythonImportsCheck = [ "oslo_privsep" ];
 
   meta = with lib; {

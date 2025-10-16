@@ -42,8 +42,20 @@ python3.pkgs.buildPythonApplication rec {
     ovsdbapp
   ]);
 
-  # Disable tests for initial packaging
-  doCheck = false;
+  nativeCheckInputs = with python3.pkgs; [
+    stestr
+    oslotest
+    testtools
+    eventlet
+    hacking
+    pyroute2
+  ];
+
+  checkPhase = ''
+    runHook preCheck
+    stestr run
+    runHook postCheck
+  '';
 
   pythonImportsCheck = [
     "ovn_bgp_agent"

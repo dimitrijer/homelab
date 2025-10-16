@@ -5,6 +5,11 @@
 , pbr
 , oslo-utils
 , prettytable
+, stestr
+, oslotest
+, testtools
+, testscenarios
+, eventlet
 }:
 
 buildPythonPackage rec {
@@ -32,7 +37,20 @@ buildPythonPackage rec {
     prettytable
   ];
 
-  doCheck = false;
+  nativeCheckInputs = [
+    stestr
+    oslotest
+    testtools
+    testscenarios
+    eventlet
+  ];
+
+  checkPhase = ''
+    runHook preCheck
+    stestr run
+    runHook postCheck
+  '';
+
   pythonImportsCheck = [ "futurist" ];
 
   meta = with lib; {

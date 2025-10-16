@@ -14,6 +14,11 @@
 , oslo-serialization
 , oslo-utils
 , webob
+, stestr
+, oslotest
+, testtools
+, fixtures
+, jsonschema
 }:
 
 buildPythonPackage rec {
@@ -50,7 +55,20 @@ buildPythonPackage rec {
     webob
   ];
 
-  doCheck = false;
+  nativeCheckInputs = [
+    stestr
+    oslotest
+    testtools
+    fixtures
+    jsonschema
+  ];
+
+  checkPhase = ''
+    runHook preCheck
+    stestr run
+    runHook postCheck
+  '';
+
   pythonImportsCheck = [ "oslo_versionedobjects" ];
 
   meta = with lib; {

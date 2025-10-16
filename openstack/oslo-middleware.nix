@@ -10,9 +10,14 @@
 , oslo-context
 , oslo-i18n
 , oslo-utils
+, oslo-serialization
 , statsd
 , stevedore
 , webob
+, stestr
+, oslotest
+, testtools
+, fixtures
 }:
 
 buildPythonPackage rec {
@@ -43,12 +48,25 @@ buildPythonPackage rec {
     oslo-context
     oslo-i18n
     oslo-utils
+    oslo-serialization
     statsd
     stevedore
     webob
   ];
 
-  doCheck = false;
+  nativeCheckInputs = [
+    stestr
+    oslotest
+    testtools
+    fixtures
+  ];
+
+  checkPhase = ''
+    runHook preCheck
+    stestr run
+    runHook postCheck
+  '';
+
   pythonImportsCheck = [ "oslo_middleware" ];
 
   meta = with lib; {

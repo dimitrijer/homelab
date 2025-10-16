@@ -9,6 +9,10 @@
 , oslo-serialization
 , oslo-utils
 , ovs
+, stestr
+, oslotest
+, testtools
+, testscenarios
 }:
 
 buildPythonPackage rec {
@@ -40,7 +44,19 @@ buildPythonPackage rec {
     ovs
   ];
 
-  doCheck = false;
+  nativeCheckInputs = [
+    stestr
+    oslotest
+    testtools
+    testscenarios
+  ];
+
+  checkPhase = ''
+    runHook preCheck
+    stestr run
+    runHook postCheck
+  '';
+
   pythonImportsCheck = [ "ovsdbapp" ];
 
   meta = with lib; {

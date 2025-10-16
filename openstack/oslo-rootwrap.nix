@@ -4,6 +4,11 @@
 , setuptools
 , pbr
 , debtcollector
+, stestr
+, oslotest
+, testtools
+, fixtures
+, eventlet
 }:
 
 buildPythonPackage rec {
@@ -30,7 +35,17 @@ buildPythonPackage rec {
     debtcollector
   ];
 
+  nativeCheckInputs = [
+    stestr
+    oslotest
+    testtools
+    fixtures
+    eventlet
+  ];
+
+  # Tests fail in Nix sandbox (expect binaries at /bin/echo, /bin/cat, etc.)
   doCheck = false;
+
   pythonImportsCheck = [ "oslo_rootwrap" ];
 
   meta = with lib; {

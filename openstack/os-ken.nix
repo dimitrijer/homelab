@@ -11,6 +11,10 @@
 , oslo-config
 , routes
 , webob
+, stestr
+, oslotest
+, testtools
+, testscenarios
 }:
 
 buildPythonPackage rec {
@@ -44,7 +48,19 @@ buildPythonPackage rec {
     webob
   ];
 
-  doCheck = false;
+  nativeCheckInputs = [
+    stestr
+    oslotest
+    testtools
+    testscenarios
+  ];
+
+  checkPhase = ''
+    runHook preCheck
+    stestr run
+    runHook postCheck
+  '';
+
   pythonImportsCheck = [ "os_ken" ];
 
   meta = with lib; {

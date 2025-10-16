@@ -18,6 +18,14 @@
 , futurist
 , oslo-middleware
 , oslo-service
+, stestr
+, oslotest
+, testtools
+, testscenarios
+, fixtures
+, eventlet
+, greenlet
+, confluent-kafka
 }:
 
 buildPythonPackage rec {
@@ -58,7 +66,20 @@ buildPythonPackage rec {
     oslo-service
   ];
 
+  nativeCheckInputs = [
+    stestr
+    oslotest
+    testtools
+    testscenarios
+    fixtures
+    eventlet
+    greenlet
+    confluent-kafka
+  ];
+
+  # Tests require pifpaf (not in nixpkgs)
   doCheck = false;
+
   pythonImportsCheck = [ "oslo_messaging" ];
 
   meta = with lib; {
