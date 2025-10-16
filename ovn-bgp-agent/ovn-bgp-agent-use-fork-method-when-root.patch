@@ -1,0 +1,21 @@
+--- a/ovn_bgp_agent/privileged/__init__.py
++++ b/ovn_bgp_agent/privileged/__init__.py
+@@ -13,6 +13,7 @@
+ #    License for the specific language governing permissions and limitations
+ #    under the License.
+
++import os
+ from oslo_privsep import capabilities
+ from oslo_privsep import priv_context
+
+@@ -42,3 +43,10 @@
+     capabilities=[capabilities.CAP_SYS_ADMIN,
+                   capabilities.CAP_NET_ADMIN]
+ )
++
++# When running as root, bypass privsep entirely - execute functions directly
++# in the main process which already has all necessary capabilities
++if os.getuid() == 0:
++    default.entrypoint = lambda func: func
++    ovs_vsctl_cmd.entrypoint = lambda func: func
++    vtysh_cmd.entrypoint = lambda func: func

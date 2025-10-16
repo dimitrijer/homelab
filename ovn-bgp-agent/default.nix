@@ -2,6 +2,11 @@
 , python3
 , fetchFromGitHub
 , openstackPythonPackages
+, ovs
+, sudo
+, makeWrapper
+, frr
+, procps
 }:
 
 python3.pkgs.buildPythonApplication rec {
@@ -18,6 +23,19 @@ python3.pkgs.buildPythonApplication rec {
 
   # pbr needs version information from git or env variable
   env.PBR_VERSION = version;
+
+  patches = [
+    ./ovn-bgp-agent-use-fork-method-when-root.patch
+    ./ovn-bgp-agent-fix-get-lrp-ports-return.patch
+    ./ovn-bgp-agent-use-vtysh-from-path.patch
+    ./ovn-bgp-agent-add-debug-logging.patch
+    ./ovn-bgp-agent-add-disable-ipv6-option.patch
+    ./ovn-bgp-agent-fix-routing-tables-dict-bug.patch
+  ];
+
+  nativeBuildInputs = [
+    makeWrapper
+  ];
 
   build-system = with python3.pkgs; [
     setuptools
@@ -55,6 +73,11 @@ python3.pkgs.buildPythonApplication rec {
     runHook preCheck
     stestr run
     runHook postCheck
+  '';
+
+  postInstall = ''
+    wrapProgram $out/bin/ovn-bgp-agent \
+      --prefix PATH : ${lib.makeBinPath [ sudo ovs frr procps ]}
   '';
 
   pythonImportsCheck = [

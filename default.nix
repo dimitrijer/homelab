@@ -4,7 +4,10 @@ let
   pkgs = import ./nix { inherit system; };
   ovn = pkgs.callPackage ./ovn { };
   openstackPythonPackages = import ./openstack { inherit pkgs; };
-  ovn-bgp-agent = pkgs.callPackage ./ovn-bgp-agent { inherit openstackPythonPackages; };
+  ovn-bgp-agent = pkgs.callPackage ./ovn-bgp-agent {
+    inherit openstackPythonPackages;
+    ovs = ovn;
+  };
   ganeti = pkgs.callPackage ./ganeti { openvswitch = ovn; };
   ganeti-os-providers = import ./ganeti/os-providers { inherit pkgs; };
   prometheus-ganeti-exporter = pkgs.callPackage ./ganeti/prometheus-exporter { };
@@ -15,7 +18,7 @@ let
         inherit ganeti prometheus-ganeti-exporter;
       };
       ovnOverlay = self: super: {
-        inherit ovn;
+        inherit ovn ovn-bgp-agent;
       };
     in
     import ./nixos/default.nix {

@@ -1,5 +1,7 @@
 { pkgs, config, lib, modulesPath, ... }:
 
+with lib;
+
 let
   hddDevice = "/dev/sda";
   nvmeDevice = "/dev/nvme0n1";
@@ -17,6 +19,7 @@ in
     ../modules/ganeti.nix
     ../modules/ovn.nix
     ../modules/prometheus-ganeti-exporter.nix
+    ../modules/ovn-bgp-agent.nix
   ];
 
   config =
@@ -73,6 +76,83 @@ in
       virtualisation.ovn = {
         enable = true;
         openFirewall = true;
+      };
+
+      services.frr = {
+        bgpd.enable = true;
+        configFile = pkgs.writeText "frr.conf" ''
+          ! FRR configuration
+          !
+          hostname dalet
+          log file /var/log/frr/frr.log debugging
+          log timestamp precision 3
+          service password-encryption
+          service integrated-vtysh-config
+          !
+          router bgp 65001
+            bgp router-id 10.1.100.5
+            bgp log-neighbor-changes
+            bgp graceful-shutdown
+            no bgp default ipv4-unicast
+            no bgp ebgp-requires-policy
+      
+            # Peer with MikroTik ToR switch
+            neighbor uplink peer-group
+            neighbor uplink remote-as 65000
+            neighbor 10.1.100.1 peer-group uplink
+
+            address-family ipv4 unicast
+              redistribute connected
+              neighbor uplink activate
+              neighbor uplink allowas-in origin
+              neighbor uplink prefix-list only-host-prefixes out
+            exit-address-family
+          !
+
+          ip prefix-list only-default permit 0.0.0.0/0
+          ip prefix-list only-host-prefixes permit 0.0.0.0/0 ge 32
+
+          route-map rm-only-default permit 10
+            match ip address prefix-list only-default
+            set src 10.1.100.5
+        
+          ip protocol bgp route-map rm-only-default
+
+          ip nht resolve-via-default
+          end
+        '';
+      };
+
+      networking.firewall = mkIf config.networking.firewall.enable {
+        allowedTCPPorts = [
+          179 # bgp
+        ];
+      };
+
+      # Create log for frr directory
+      systemd.tmpfiles.rules = [
+        "d /var/log/frr 0755 frr frr -"
+      ];
+
+      services.ovn-bgp-agent = {
+        enable = true;
+        settings =
+          {
+            DEFAULT = {
+              debug = true;
+              bgp_AS = 65001;
+              bgp_router_id = "10.1.100.5";
+              driver = "nb_ovn_bgp_driver";
+              exposing_method = "underlay";
+              ovsdb_connection = "unix:/var/run/openvswitch/db.sock";
+              disable_ipv6 = true;
+            };
+            ovn = {
+              ovn_nb_connection = "tcp:10.1.100.5:6641";
+              ovn_sb_connection = "tcp:10.1.100.5:6642";
+            };
+            agent.root_helper = "";
+          };
       };
       systemd.services.ovn-northd.unitConfig.ConditionHost = "dalet";
 
@@ -241,7 +321,7 @@ in
       # `lvm.conf`, which is empty by default, unless you use snapshots, thin
       # volumes etc.
       # (see https://docs.ganeti.org/docs/ganeti/3.0/html/install.html#id24).
-      environment.etc."/lvm/lvm.conf".text = lib.mkForce ''
+      environment.etc."/lvm/lvm.conf".text = mkForce ''
         devices {
           filter = ["r|/dev/drbd[0-9]+|"]
         }

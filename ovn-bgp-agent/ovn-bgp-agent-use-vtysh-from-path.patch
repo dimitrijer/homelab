@@ -1,0 +1,40 @@
+--- a/ovn_bgp_agent/privileged/vtysh.py
++++ b/ovn_bgp_agent/privileged/vtysh.py
+@@ -23,7 +23,7 @@ LOG = logging.getLogger(__name__)
+ 
+ @ovn_bgp_agent.privileged.vtysh_cmd.entrypoint
+ def run_vtysh_config(frr_config_file):
+-    full_args = ['/usr/bin/vtysh', '--vty_socket', constants.FRR_SOCKET_PATH,
++    full_args = ['vtysh', '--vty_socket', constants.FRR_SOCKET_PATH,
+                  '-f', frr_config_file]
+     try:
+         return processutils.execute(*full_args)
+@@ -35,7 +35,7 @@ def run_vtysh_config(frr_config_file):
+ 
+ @ovn_bgp_agent.privileged.vtysh_cmd.entrypoint
+ def run_vtysh_command(command):
+-    full_args = ['/usr/bin/vtysh', '--vty_socket', constants.FRR_SOCKET_PATH,
++    full_args = ['vtysh', '--vty_socket', constants.FRR_SOCKET_PATH,
+                  '-c', command]
+     try:
+         return processutils.execute(*full_args)[0]
+--- a/ovn_bgp_agent/tests/unit/privileged/test_vtysh.py
++++ b/ovn_bgp_agent/tests/unit/privileged/test_vtysh.py
+@@ -42,7 +42,7 @@ class TestPrivilegedVtysh(base.TestCase):
+     def test_run_vtysh_config(self):
+         vtysh.run_vtysh_config('/fake/frr.config')
+         self.mock_exc.assert_called_once_with(
+-            '/usr/bin/vtysh', '--vty_socket', constants.FRR_SOCKET_PATH,
++            'vtysh', '--vty_socket', constants.FRR_SOCKET_PATH,
+             '-f', '/fake/frr.config')
+ 
+     def test_run_vtysh_config_exception(self):
+@@ -55,7 +55,7 @@ class TestPrivilegedVtysh(base.TestCase):
+         cmd = 'show ip bgp summary json'
+         vtysh.run_vtysh_command(cmd)
+         self.mock_exc.assert_called_once_with(
+-            '/usr/bin/vtysh', '--vty_socket', constants.FRR_SOCKET_PATH,
++            'vtysh', '--vty_socket', constants.FRR_SOCKET_PATH,
+             '-c', cmd)
+ 
+     def test_run_vtysh_command_exception(self):

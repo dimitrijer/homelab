@@ -5,21 +5,93 @@ with lib;
 let
   cfg = config.services.ovn-bgp-agent;
 
-  configFile = pkgs.writeText "bgp-agent.conf" ''
-    [DEFAULT]
-    debug = ${if cfg.debug then "True" else "False"}
+  format = pkgs.formats.ini { };
 
-    [ovn]
-    ovn_nb_connection = ${cfg.ovn.nbConnection}
-    ovn_sb_connection = ${cfg.ovn.sbConnection}
-    ovs_db_connection = ${cfg.ovs.connection}
+  configFile = format.generate "bgp-agent.conf" cfg.settings;
 
-    [agent]
-    driver = ${cfg.driver}
-    expose_tenant_networks = ${if cfg.exposeTenantNetworks then "True" else "False"}
+  testScript = pkgs.writeScriptBin "test-ovn-bgp-netlink" ''
+    #!${pkgs.python3.withPackages (ps: [ ps.pyroute2 ])}/bin/python3
+    import os
+    import sys
+    import traceback
+    from pyroute2 import IPRoute
 
-    ${cfg.extraConfig}
+    def main():
+        print("Testing pyroute2 netlink operations as root...")
+        print(f"Running as UID: {os.getuid()}")
+
+        ip = IPRoute()
+        dummy_name = "test-dummy-ovn"
+        test_ip = "192.0.2.1"
+        test_prefixlen = 32
+
+        try:
+            # Create dummy interface
+            print(f"\n1. Creating dummy interface '{dummy_name}'...")
+            ip.link("add", ifname=dummy_name, kind="dummy")
+            print("   SUCCESS: Dummy interface created")
+
+            # Get interface index
+            idx = ip.link_lookup(ifname=dummy_name)[0]
+            print(f"   Interface index: {idx}")
+
+            # Bring interface up
+            print(f"\n2. Bringing interface up...")
+            ip.link("set", index=idx, state="up")
+            print("   SUCCESS: Interface is up")
+
+            # Add IP address
+            print(f"\n3. Adding IP {test_ip}/{test_prefixlen} to interface...")
+            ip.addr("add", index=idx, address=test_ip, mask=test_prefixlen)
+            print("   SUCCESS: IP address added!")
+
+            # List addresses to verify
+            print(f"\n4. Verifying IP addresses on {dummy_name}:")
+            for addr in ip.get_addr(index=idx):
+                print(f"   {addr}")
+
+            print("\n✓ All tests passed! Netlink operations work correctly.")
+            return 0
+
+        except Exception as e:
+            print(f"\n✗ ERROR: {e}")
+            print("\nFull traceback:")
+            traceback.print_exc()
+            return 1
+
+        finally:
+            # Cleanup
+            try:
+                print(f"\n5. Cleaning up: removing {dummy_name}...")
+                ip.link("del", ifname=dummy_name)
+                print("   SUCCESS: Cleanup complete")
+            except Exception as e:
+                print(f"   WARNING: Cleanup failed: {e}")
+            ip.close()
+
+    if __name__ == "__main__":
+        sys.exit(main())
   '';
+
+  defaultSettings = {
+    DEFAULT = mkDefault {
+      debug = true;
+      bgp_AS = 65001;
+      bgp_router_id = "192.168.0.2";
+      expose_tenant_networks = false;
+      require_snat_disabled_for_tenant_networks = true;
+      exposing_method = "underlay";
+      advertisement_method_tenant_networks = "host";
+      ovsdb_connection = "unix:/var/run/openvswitch/db.sock";
+      disable_ipv6 = true;
+      log_file = "/var/log/ovn-bgp-agent/ovn-bgp-agent.log";
+      use_stderr = false;
+    };
+    ovn = mkDefault {
+      ovn_nb_connection = "tcp:127.0.0.1:6641";
+      ovn_sb_connection = "tcp:127.0.0.1:6642";
+    };
+  };
 in
 {
   options.services.ovn-bgp-agent = {
@@ -32,60 +104,31 @@ in
       description = "OVN BGP Agent package to use";
     };
 
-    debug = mkOption {
-      type = types.bool;
-      default = false;
-      description = "Enable debug logging";
-    };
-
-    driver = mkOption {
-      type = types.enum [ "ovn_bgp_driver" "nb_ovn_bgp_driver" ];
-      default = "nb_ovn_bgp_driver";
+    settings = mkOption {
+      type = format.type;
+      default = defaultSettings;
       description = ''
-        BGP driver to use.
-        - ovn_bgp_driver: Uses OVN Southbound DB
-        - nb_ovn_bgp_driver: Uses OVN Northbound DB
+        Configuration for ovn-bgp-agent. See
+        <https://github.com/openstack/ovn-bgp-agent/blob/master/ovn_bgp_agent/config.py>
+        for available options.
       '';
-    };
-
-    exposeTenantNetworks = mkOption {
-      type = types.bool;
-      default = false;
-      description = "Whether to expose tenant networks through BGP";
-    };
-
-    ovn = {
-      nbConnection = mkOption {
-        type = types.str;
-        default = "tcp:127.0.0.1:6641";
-        description = "OVN Northbound database connection string";
-        example = "ssl:127.0.0.1:6641";
-      };
-
-      sbConnection = mkOption {
-        type = types.str;
-        default = "tcp:127.0.0.1:6642";
-        description = "OVN Southbound database connection string";
-        example = "ssl:127.0.0.1:6642";
-      };
-    };
-
-    ovs = {
-      connection = mkOption {
-        type = types.str;
-        default = "tcp:127.0.0.1:6640";
-        description = "OVS database connection string";
-      };
-    };
-
-    extraConfig = mkOption {
-      type = types.lines;
-      default = "";
-      description = "Extra configuration to append to bgp-agent.conf";
-      example = ''
-        [bgp]
-        AS = 64999
-        router_id = 192.0.2.1
+      example = literalExpression ''
+        {
+          DEFAULT = {
+            debug = false;
+            bgp_AS = 65001;
+            bgp_router_id = "192.168.0.2";
+            expose_tenant_networks = false;
+            require_snat_disabled_for_tenant_networks = true;
+            exposing_method = "underlay";
+            advertisement_method_tenant_networks = "host";
+            ovsdb_connection = "unix:/var/run/openvswitch/db.sock";
+          };
+          ovn = mkDefault {
+            ovn_nb_connection = "tcp:127.0.0.1:6641";
+            ovn_sb_connection = "tcp:127.0.0.1:6642";
+          };
+        }
       '';
     };
   };
@@ -99,7 +142,7 @@ in
       }
     ];
 
-    environment.systemPackages = [ cfg.package ];
+    environment.systemPackages = [ cfg.package testScript ];
 
     # Create configuration directory and file
     environment.etc."ovn-bgp-agent/bgp-agent.conf".source = configFile;
@@ -114,30 +157,39 @@ in
 
       wantedBy = [ "multi-user.target" ];
 
+      # Create routing tables file if it doesn't exist
+      # ovn-bgp-agent needs to append to this file
+      preStart = ''
+                if [ ! -f /etc/iproute2/rt_tables ]; then
+                  mkdir -p /etc/iproute2
+                  cat > /etc/iproute2/rt_tables << 'EOF'
+        #
+        # reserved values
+        #
+        255	local
+        254	main
+        253	default
+        0	unspec
+        #
+        # local
+        #
+        EOF
+        fi
+      '';
+
       serviceConfig = {
         Type = "simple";
         User = "root";
         Group = "root";
         ExecStart = "${cfg.package}/bin/ovn-bgp-agent --config-dir /etc/ovn-bgp-agent";
         Restart = "on-failure";
-        RestartSec = "5s";
-
-        # Security hardening
-        PrivateTmp = true;
-        ProtectSystem = "strict";
-        ProtectHome = true;
-        NoNewPrivileges = false; # Needs privileges for network configuration
-        ReadWritePaths = [ "/run" "/var/lib/ovn-bgp-agent" ];
-
-        # Capabilities needed for network operations
-        AmbientCapabilities = [ "CAP_NET_ADMIN" "CAP_NET_RAW" ];
-        CapabilityBoundingSet = [ "CAP_NET_ADMIN" "CAP_NET_RAW" ];
+        RestartSec = "30s";
       };
     };
 
-    # Create state directory
+    # Create log directories
     systemd.tmpfiles.rules = [
-      "d /var/lib/ovn-bgp-agent 0755 root root -"
+      "d /var/log/ovn-bgp-agent 0755 root root -"
     ];
   };
 }

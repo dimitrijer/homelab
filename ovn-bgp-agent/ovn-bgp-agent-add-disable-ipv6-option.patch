@@ -1,0 +1,102 @@
+diff --git a/ovn_bgp_agent/config.py b/ovn_bgp_agent/config.py
+index df41618..f65e30f 100644
+--- a/ovn_bgp_agent/config.py
++++ b/ovn_bgp_agent/config.py
+@@ -143,6 +143,12 @@ agent_opts = [
+                     'Finally, with ovn, instead of using kernel networking a '
+                     'dedicated ovn cluster per node is used for the traffic '
+                     'redirection'),
++    cfg.BoolOpt('disable_ipv6',
++                default=False,
++                help='Disable IPv6 address operations. When enabled, the agent '
++                     'will skip adding or deleting IPv6 addresses on interfaces. '
++                     'This is useful when IPv6 is disabled at the system level '
++                     'but OVN logical networks still contain IPv6 subnets.'),
+ ]
+ 
+ root_helper_opts = [
+diff --git a/ovn_bgp_agent/privileged/linux_net.py b/ovn_bgp_agent/privileged/linux_net.py
+index 91f48c3..ef8ca09 100644
+--- a/ovn_bgp_agent/privileged/linux_net.py
++++ b/ovn_bgp_agent/privileged/linux_net.py
+@@ -20,6 +20,7 @@ import netaddr
+ 
+ from neutron_lib import constants as n_const
+ from oslo_concurrency import processutils
++from oslo_config import cfg
+ from oslo_log import log as logging
+ import pyroute2
+ from pyroute2 import iproute
+@@ -568,6 +569,14 @@ def add_ip_address(ip_address, ifname, prefixlen=None, **kwargs):
+     ifname = ifname[:n_const.DEVICE_NAME_MAX_LEN]
+     net = netaddr.IPNetwork(ip_address)
+     ip_version = l_net.get_ip_version(ip_address)
++
++    # Skip IPv6 operations when IPv6 is disabled via configuration
++    if ip_version == 6 and cfg.CONF.disable_ipv6:
++        LOG.warning("Skipping IPv6 address addition: %s on %s "
++                   "(disable_ipv6 config option is enabled)",
++                   ip_address, ifname)
++        return
++
+     address = str(net.ip)
+     if not prefixlen:
+         prefixlen = 32 if ip_version == 4 else 128
+@@ -584,6 +593,14 @@ def delete_ip_address(ip_address, ifname, prefixlen=None, **kwargs):
+     ifname = ifname[:n_const.DEVICE_NAME_MAX_LEN]
+     net = netaddr.IPNetwork(ip_address)
+     ip_version = l_net.get_ip_version(ip_address)
++
++    # Skip IPv6 operations when IPv6 is disabled via configuration
++    if ip_version == 6 and cfg.CONF.disable_ipv6:
++        LOG.warning("Skipping IPv6 address deletion: %s on %s "
++                   "(disable_ipv6 config option is enabled)",
++                   ip_address, ifname)
++        return
++
+     address = str(net.ip)
+     if not prefixlen:
+         prefixlen = 32 if ip_version == 4 else 128
+diff --git a/ovn_bgp_agent/utils/linux_net.py b/ovn_bgp_agent/utils/linux_net.py
+index 7265e63..16b6ff6 100644
+--- a/ovn_bgp_agent/utils/linux_net.py
++++ b/ovn_bgp_agent/utils/linux_net.py
+@@ -19,6 +19,7 @@ import sys
+ 
+ import netaddr
+ from neutron_lib import constants as n_const
++from oslo_config import cfg
+ from oslo_log import log as logging
+ import pyroute2
+ from pyroute2.netlink import exceptions as netlink_exceptions
+@@ -434,6 +435,11 @@ def get_bridge_vlans(bridge):
+ 
+ 
+ def enable_proxy_ndp(device):
++    # Skip IPv6 sysctl when IPv6 is disabled via configuration
++    if cfg.CONF.disable_ipv6:
++        LOG.debug("Skipping IPv6 proxy_ndp for %s (disable_ipv6 enabled)",
++                 device)
++        return
+     flag = f"net.ipv6.conf.{device[:n_const.DEVICE_NAME_MAX_LEN]}.proxy_ndp"
+     ovn_bgp_agent.privileged.linux_net.set_kernel_flag(flag, 1)
+ 
+@@ -448,12 +454,16 @@ def enable_routing_for_interfaces(*interfaces):
+     keys = [
+         ('net.ipv4.ip_forward', 1),
+         ('net.ipv4.conf.all.forwarding', 1),
+-        ('net.ipv6.conf.all.forwarding', 1),
+     ]
++    # Only add IPv6 sysctls if IPv6 is not disabled
++    if not cfg.CONF.disable_ipv6:
++        keys.append(('net.ipv6.conf.all.forwarding', 1))
++
+     for intf in interfaces:
+         intf_key = intf.replace('.', '/')
+         keys.append((f'net.ipv4.conf.{intf_key}.forwarding', 1))
+-        keys.append((f'net.ipv6.conf.{intf_key}.forwarding', 1))
++        if not cfg.CONF.disable_ipv6:
++            keys.append((f'net.ipv6.conf.{intf_key}.forwarding', 1))
+ 
+     for k, v in keys:
+         LOG.debug('Configure sysctl %s=%s', k, v)
