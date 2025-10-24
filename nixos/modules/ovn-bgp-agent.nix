@@ -75,7 +75,7 @@ let
 
   defaultSettings = {
     DEFAULT = mkDefault {
-      debug = true;
+      debug = false;
       bgp_AS = 65001;
       bgp_router_id = "192.168.0.2";
       expose_tenant_networks = false;

@@ -112,9 +112,12 @@ in
         };
 
         vswitches = {
-          br0.interfaces = {
-            "${cfg.primaryInterface}" = {
-              name = "${cfg.primaryInterface}";
+          br0 = {
+            supportedOpenFlowVersions = [ "OpenFlow10" "OpenFlow13" ];
+            interfaces = {
+              "${cfg.primaryInterface}" = {
+                name = "${cfg.primaryInterface}";
+              };
             };
           };
         };

@@ -146,6 +146,8 @@ in
               exposing_method = "underlay";
               ovsdb_connection = "unix:/var/run/openvswitch/db.sock";
               disable_ipv6 = true;
+              log_file = "/var/log/ovn-bgp-agent/ovn-bgp-agent.log";
+              use_stderr = false;
             };
             ovn = {
               ovn_nb_connection = "tcp:10.1.100.5:6641";
@@ -178,6 +180,8 @@ in
           "net.core.optmem_max" = 56623104;
           "net.ipv4.tcp_rmem" = "4096 87380 56623104";
           "net.ipv4.tcp_wmem" = "4096 65536 56623104";
+          # Enable forwarding (needed for ovn-bgp-agent)
+          "net.ipv4.ip_forward" = 1;
         };
         extraModulePackages = with config.boot.kernelPackages; [
           #drbd # DRBD 9.x
