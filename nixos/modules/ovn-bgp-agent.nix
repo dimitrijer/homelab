@@ -9,70 +9,6 @@ let
 
   configFile = format.generate "bgp-agent.conf" cfg.settings;
 
-  testScript = pkgs.writeScriptBin "test-ovn-bgp-netlink" ''
-    #!${pkgs.python3.withPackages (ps: [ ps.pyroute2 ])}/bin/python3
-    import os
-    import sys
-    import traceback
-    from pyroute2 import IPRoute
-
-    def main():
-        print("Testing pyroute2 netlink operations as root...")
-        print(f"Running as UID: {os.getuid()}")
-
-        ip = IPRoute()
-        dummy_name = "test-dummy-ovn"
-        test_ip = "192.0.2.1"
-        test_prefixlen = 32
-
-        try:
-            # Create dummy interface
-            print(f"\n1. Creating dummy interface '{dummy_name}'...")
-            ip.link("add", ifname=dummy_name, kind="dummy")
-            print("   SUCCESS: Dummy interface created")
-
-            # Get interface index
-            idx = ip.link_lookup(ifname=dummy_name)[0]
-            print(f"   Interface index: {idx}")
-
-            # Bring interface up
-            print(f"\n2. Bringing interface up...")
-            ip.link("set", index=idx, state="up")
-            print("   SUCCESS: Interface is up")
-
-            # Add IP address
-            print(f"\n3. Adding IP {test_ip}/{test_prefixlen} to interface...")
-            ip.addr("add", index=idx, address=test_ip, mask=test_prefixlen)
-            print("   SUCCESS: IP address added!")
-
-            # List addresses to verify
-            print(f"\n4. Verifying IP addresses on {dummy_name}:")
-            for addr in ip.get_addr(index=idx):
-                print(f"   {addr}")
-
-            print("\n✓ All tests passed! Netlink operations work correctly.")
-            return 0
-
-        except Exception as e:
-            print(f"\n✗ ERROR: {e}")
-            print("\nFull traceback:")
-            traceback.print_exc()
-            return 1
-
-        finally:
-            # Cleanup
-            try:
-                print(f"\n5. Cleaning up: removing {dummy_name}...")
-                ip.link("del", ifname=dummy_name)
-                print("   SUCCESS: Cleanup complete")
-            except Exception as e:
-                print(f"   WARNING: Cleanup failed: {e}")
-            ip.close()
-
-    if __name__ == "__main__":
-        sys.exit(main())
-  '';
-
   defaultSettings = {
     DEFAULT = mkDefault {
       debug = false;
@@ -142,7 +78,7 @@ in
       }
     ];
 
-    environment.systemPackages = [ cfg.package testScript ];
+    environment.systemPackages = [ cfg.package ];
 
     # Create configuration directory and file
     environment.etc."ovn-bgp-agent/bgp-agent.conf".source = configFile;
