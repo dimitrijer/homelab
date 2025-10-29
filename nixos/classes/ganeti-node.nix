@@ -16,8 +16,10 @@ in
   imports = [
     ../modules/common.nix
     ../modules/provisioning/disks.nix
+    ../modules/cluster-config.nix
     ../modules/ganeti.nix
     ../modules/ovn.nix
+    ../modules/frr.nix
     ../modules/prometheus-ganeti-exporter.nix
     ../modules/ovn-bgp-agent.nix
   ];
@@ -73,66 +75,19 @@ in
         ];
       };
 
+      provisioning.clusterConfig.enable = true;
+
       virtualisation.ovn = {
         enable = true;
         openFirewall = true;
       };
 
-      services.frr = {
-        bgpd.enable = true;
-        configFile = pkgs.writeText "frr.conf" ''
-          ! FRR configuration
-          !
-          hostname dalet
-          log file /var/log/frr/frr.log debugging
-          log timestamp precision 3
-          service password-encryption
-          service integrated-vtysh-config
-          !
-          router bgp 65001
-            bgp router-id 10.1.100.5
-            bgp log-neighbor-changes
-            bgp graceful-shutdown
-            no bgp default ipv4-unicast
-            no bgp ebgp-requires-policy
-      
-            # Peer with MikroTik ToR switch
-            neighbor uplink peer-group
-            neighbor uplink remote-as 65000
-            neighbor 10.1.100.1 peer-group uplink
-
-            address-family ipv4 unicast
-              redistribute connected
-              neighbor uplink activate
-              neighbor uplink allowas-in origin
-              neighbor uplink prefix-list only-host-prefixes out
-            exit-address-family
-          !
-
-          ip prefix-list only-default permit 0.0.0.0/0
-          ip prefix-list only-host-prefixes permit 0.0.0.0/0 ge 32
-
-          route-map rm-only-default permit 10
-            match ip address prefix-list only-default
-            set src 10.1.100.5
-        
-          ip protocol bgp route-map rm-only-default
-
-          ip nht resolve-via-default
-          end
-        '';
+      services.frr-bgp = {
+        enable = true;
+        localAS = 65001;
+        remoteAS = 65000;
+        uplinkPeer = "10.1.100.1";
       };
-
-      networking.firewall = mkIf config.networking.firewall.enable {
-        allowedTCPPorts = [
-          179 # bgp
-        ];
-      };
-
-      # Create log for frr directory
-      systemd.tmpfiles.rules = [
-        "d /var/log/frr 0755 frr frr -"
-      ];
 
       services.ovn-bgp-agent = {
         enable = true;
