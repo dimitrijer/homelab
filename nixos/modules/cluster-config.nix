@@ -49,8 +49,7 @@ in
   config = mkIf cfg.enable {
     systemd.services."provision-cluster-config" = {
       description = "Provision cluster configuration from hostname";
-      after = [ "network-online.target" ];
-      wants = [ "network-online.target" ];
+      # No network dependency needed - hostname is set from kernel cmdline
 
       path = with pkgs; [ coreutils inetutils ];
       script = ''
