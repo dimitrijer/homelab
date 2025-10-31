@@ -96,7 +96,6 @@ in
             DEFAULT = {
               debug = false;
               bgp_AS = 65001;
-              bgp_router_id = "10.1.100.5";
               driver = "nb_ovn_bgp_driver";
               exposing_method = "underlay";
               ovsdb_connection = "unix:/var/run/openvswitch/db.sock";
