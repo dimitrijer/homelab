@@ -78,6 +78,9 @@ in
       }
     ];
 
+    # Needed for additional routing tables.
+    networking.iproute2.enable = true;
+
     environment.systemPackages = [ cfg.package ];
 
     # Create configuration directory and file
