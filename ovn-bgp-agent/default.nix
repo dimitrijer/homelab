@@ -25,10 +25,9 @@ python3.pkgs.buildPythonApplication rec {
   env.PBR_VERSION = version;
 
   patches = [
-    ./ovn-bgp-agent-use-fork-method-when-root.patch
+    ./ovn-bgp-agent-no-privsep-when-root.patch
     ./ovn-bgp-agent-fix-get-lrp-ports-return.patch
     ./ovn-bgp-agent-use-vtysh-from-path.patch
-    ./ovn-bgp-agent-add-debug-logging.patch
     ./ovn-bgp-agent-add-disable-ipv6-option.patch
     ./ovn-bgp-agent-fix-routing-tables-dict-bug.patch
   ];
