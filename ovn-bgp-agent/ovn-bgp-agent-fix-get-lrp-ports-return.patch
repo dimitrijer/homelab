@@ -1,0 +1,10 @@
+--- a/ovn_bgp_agent/drivers/openstack/utils/ovn.py	2025-10-16 20:33:22.278330596 +0100
++++ b/ovn_bgp_agent/drivers/openstack/utils/ovn.py	2025-10-16 20:33:27.939540544 +0100
+@@ -646,6 +646,7 @@
+                 continue
+             if self.is_provider_network(lrp_port.datapath):
+                 provider_lrp_ports.append(lrp_port)
++        return provider_lrp_ports
+ 
+     def get_port_datapath(self, port_name):
+         port_info = self.get_port_by_name(port_name)

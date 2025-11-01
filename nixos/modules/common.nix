@@ -45,6 +45,11 @@
   console.keyMap = "us";
   time.timeZone = "Europe/London";
 
+  # Use faster compression for initrd and squashfs to speed up builds
+  boot.initrd.compressor = "zstd";
+  boot.initrd.compressorArgs = [ "-1" "-T0" ];
+  netboot.squashfsCompression = "zstd -Xcompression-level 1";
+
   networking.firewall = {
     enable = true;
   };

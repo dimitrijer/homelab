@@ -67,5 +67,11 @@ in
     services.openssh = {
       hostKeys = lib.mkForce [ ];
     };
+
+    # Disable sshd-keygen service since we provision keys ourselves
+    systemd.services.sshd-keygen = {
+      enable = false;
+      wantedBy = lib.mkForce [ ];
+    };
   };
 }

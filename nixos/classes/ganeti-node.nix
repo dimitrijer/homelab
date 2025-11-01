@@ -1,5 +1,7 @@
 { pkgs, config, lib, modulesPath, ... }:
 
+with lib;
+
 let
   hddDevice = "/dev/sda";
   nvmeDevice = "/dev/nvme0n1";
@@ -14,9 +16,12 @@ in
   imports = [
     ../modules/common.nix
     ../modules/provisioning/disks.nix
+    ../modules/cluster-config.nix
     ../modules/ganeti.nix
     ../modules/ovn.nix
+    ../modules/frr.nix
     ../modules/prometheus-ganeti-exporter.nix
+    ../modules/ovn-bgp-agent.nix
   ];
 
   config =
@@ -70,9 +75,40 @@ in
         ];
       };
 
+      provisioning.clusterConfig.enable = true;
+
       virtualisation.ovn = {
         enable = true;
         openFirewall = true;
+      };
+
+      services.frr-bgp = {
+        enable = true;
+        localAS = 65001;
+        remoteAS = 65000;
+        uplinkPeer = "10.1.100.1";
+      };
+
+      services.ovn-bgp-agent = {
+        enable = true;
+        settings =
+          {
+            DEFAULT = {
+              debug = false;
+              bgp_AS = 65001;
+              driver = "nb_ovn_bgp_driver";
+              exposing_method = "underlay";
+              ovsdb_connection = "unix:/var/run/openvswitch/db.sock";
+              disable_ipv6 = true;
+              log_file = "/var/log/ovn-bgp-agent/ovn-bgp-agent.log";
+              use_stderr = false;
+            };
+            ovn = {
+              ovn_nb_connection = "tcp:10.1.100.5:6641";
+              ovn_sb_connection = "tcp:10.1.100.5:6642";
+            };
+            agent.root_helper = "";
+          };
       };
       systemd.services.ovn-northd.unitConfig.ConditionHost = "dalet";
 
@@ -98,6 +134,8 @@ in
           "net.core.optmem_max" = 56623104;
           "net.ipv4.tcp_rmem" = "4096 87380 56623104";
           "net.ipv4.tcp_wmem" = "4096 65536 56623104";
+          # Enable forwarding (needed for ovn-bgp-agent)
+          "net.ipv4.ip_forward" = 1;
         };
         extraModulePackages = with config.boot.kernelPackages; [
           #drbd # DRBD 9.x
@@ -241,7 +279,7 @@ in
       # `lvm.conf`, which is empty by default, unless you use snapshots, thin
       # volumes etc.
       # (see https://docs.ganeti.org/docs/ganeti/3.0/html/install.html#id24).
-      environment.etc."/lvm/lvm.conf".text = lib.mkForce ''
+      environment.etc."/lvm/lvm.conf".text = mkForce ''
         devices {
           filter = ["r|/dev/drbd[0-9]+|"]
         }
