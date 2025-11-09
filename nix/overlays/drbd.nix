@@ -4,16 +4,17 @@ self: super: {
       drbd = kprev.drbd.overrideAttrs
         (oldAttrs: rec {
           version = "9.2.15";
-          src = super.fetchurl {
-            url = "https://pkg.linbit.com/downloads/drbd/9/drbd-${version}.tar.gz";
-            hash = "sha256-bKaL7wtjlSbUkLRlMSrGYjab0jdS8lu5bgScTbfpllE=";
+          src = super.fetchgit {
+            url = "https://github.com/LINBIT/drbd.git";
+            rev = "a0bc041dbc27031dfd8b00e7b6a2d2dfdc0c78ce";
+            hash = super.lib.fakeHash;
           };
           makeFlags = oldAttrs.makeFlags ++ [ "CONFIG_DRBD_COMPAT_84=y" ];
         });
     });
   drbd = super.drbd.overrideAttrs
     (oldAttrs: rec {
-      version = "9.32.0";
+      version = "9.33.0";
       preConfigure = ''
         ${oldAttrs.preConfigure or ""}
         ./autogen.sh
@@ -26,8 +27,8 @@ self: super: {
 
       src = super.fetchgit {
         url = "https://github.com/LINBIT/drbd-utils.git";
-        rev = "fa022500e8401a1004095fd3347325b4a837ccd5";
-        hash = "sha256-+VMu4Oax29IOyxZXjBuxlUrZcxJjBACp0pC1/TGn1fg=";
+        rev = "abd47fbdf079d96766e4312f52eef038fc2c6723";
+        hash = "sha256-WeQd2q/WgjNpXrTnkegEwVVg9r8wsQmAWbmXgrhoXbY=";
         fetchSubmodules = true;
       };
     });
