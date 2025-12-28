@@ -67,6 +67,7 @@
       inetutils
       dig
       rsync
+      tmux
     ];
 
   services.prometheus.exporters.node = {
