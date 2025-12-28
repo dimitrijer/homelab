@@ -181,6 +181,7 @@ in
             DHCP = "yes";
             KeepConfiguration = "no";
           };
+          domains = [ "~${cfg.domain}" ];
         };
       };
       services.openssh = {
