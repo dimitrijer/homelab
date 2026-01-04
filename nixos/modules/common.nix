@@ -45,10 +45,9 @@
   console.keyMap = "us";
   time.timeZone = "Europe/London";
 
-  # Use faster compression for initrd and squashfs to speed up builds
+  # Use faster compression for initrd to speed up builds
   boot.initrd.compressor = "zstd";
   boot.initrd.compressorArgs = [ "-1" "-T0" ];
-  netboot.squashfsCompression = "zstd -Xcompression-level 1";
 
   networking.firewall = {
     enable = true;
@@ -68,6 +67,8 @@
       dig
       rsync
       tmux
+      python3
+      bc
     ];
 
   services.prometheus.exporters.node = {
