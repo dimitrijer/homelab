@@ -1,4 +1,4 @@
-{ pkgs }:
+{ pkgs ? import <nixpkgs> { } }:
 
 let
   nginxPort = "8080";
