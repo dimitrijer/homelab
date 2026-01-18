@@ -41,3 +41,9 @@ Disks are provisioned with [disko](https://github.com/nix-community/disko), and
 root and host keys are provisioned through a systemd service. Once host keys
 are in place, I use [agenix](https://github.com/ryantm/agenix) to decrypt and
 deploy secrets.
+
+Nix store squashfs is cached locally on both physical and virtual machines.
+During stage 1 NixOS boot, cache freshness is checked, and a new image is
+downloaded if needed. After that, Nix store is mounted using overlayfs, with
+squashfs contents being mounted read-only, and a tmpfs writable layer being
+mounted on top of it.
