@@ -71,8 +71,7 @@ let
     };
 
   # New HTTP-based netboot builder (downloads store from boot server)
-  # cache options: { enable ? true, volumeGroup ? "pool_state", path ? "/var/cache/netboot/store.squashfs" }
-  mkNetbuildHttp = { className, modules, cache ? { }, httpProxy ? "" }:
+  mkNetbuildHttp = { className, modules }:
     let
       storeUrl = "http://${deployHost}/nixos/by-class/${className}/store.squashfs";
 
@@ -102,7 +101,7 @@ let
 
                   netboot-http = {
                     enable = true;
-                    inherit storeUrl cache httpProxy;
+                    inherit storeUrl;
                   };
                 };
               })
@@ -181,22 +180,12 @@ in
     ];
   };
 
-  # HTTP-based netboot builds (store downloaded at boot)
-  # Caching is enabled by default (uses /dev/pool_state/var)
-  # To disable: cache = { enable = false; };
-  # To customize: cache = { volumeGroup = "my_vg"; path = "/var/cache/store.squashfs"; };
+  # HTTP-based netboot builds (store downloaded at boot and cached)
   ganeti-node-http = mkNetbuildHttp {
     className = "ganeti-node";
     modules = [
       ./classes/ganeti-node.nix
     ];
-    cache = {
-      volumeGroup = "pool_host";
-    };
-    # We can't initialize enp0s31f6 (e1000e) NIC at boot because of some AMT
-    # madness, so we initialize secondary NIC enp3s0 (igc), and use a proxy
-    # to download the squashfs.
-    httpProxy = "http://10.1.97.1:8080";
   };
 
   calibre-web-http = mkNetbuildHttp {

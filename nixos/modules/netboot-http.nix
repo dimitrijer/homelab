@@ -62,7 +62,7 @@ in
     # Build the squashfs store image
     system.build.squashfsStore = pkgs.callPackage (modulesPath + "/../lib/make-squashfs.nix") {
       storeContents = cfg.storeContents;
-      comp = "zstd -Xcompression-level ${cfg.squashfsCompression}";
+      comp = "zstd -Xcompression-level ${toString cfg.squashfsCompression}";
     };
 
     # Minimal initrd with network and squashfs support

@@ -123,6 +123,9 @@ in
         # For DHCP in stage 1.
         initrd = {
           kernelModules = [ "igc" ];
+
+          # The NIC needs a bit of time to initialize, so do a few more
+          # DHCP retries, with more time in between.
           network.udhcpc.extraArgs = [ "-t" "10" "-T" "5" ];
         };
 
@@ -291,5 +294,17 @@ in
           filter = ["r|/dev/drbd[0-9]+|"]
         }
       '';
+
+      netboot-http = {
+        cache = {
+          # Physical boxes use a different VG for /var to virtual boxes.
+          volumeGroup = "pool_host";
+        };
+        # We can't initialize enp0s31f6 (e1000e) NIC at boot because of AMT
+        # weirdness ("reset blocked by ME"). Instead, we use the secondary NIC
+        # enp3s0 (igc), and download the squashfs over a proxy (no default
+        # gateway nor DNS for that network).
+        httpProxy = "http://10.1.97.1:8080";
+      };
     };
 }
