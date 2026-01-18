@@ -52,9 +52,9 @@ in
     };
 
     squashfsCompression = mkOption {
-      type = types.str;
-      default = "zstd -Xcompression-level 1";
-      description = "Compression to use for squashfs";
+      type = types.int;
+      default = 1;
+      description = "Compression to use for squashfs (1 - fastest, 22 - slowest)";
     };
   };
 
@@ -62,7 +62,7 @@ in
     # Build the squashfs store image
     system.build.squashfsStore = pkgs.callPackage (modulesPath + "/../lib/make-squashfs.nix") {
       storeContents = cfg.storeContents;
-      comp = cfg.squashfsCompression;
+      comp = "zstd -Xcompression-level ${cfg.squashfsCompression}";
     };
 
     # Minimal initrd with network and squashfs support
@@ -95,35 +95,32 @@ in
       fi
 
       # Function to check if cache is stale using HTTP If-Modified-Since
+      # Returns 0 for stale, and 1 for fresh.
       is_cache_stale() {
         local cache_file="$1"
         local url="$2"
 
-        # Get cache file's modification time and format as HTTP date
         local cache_epoch=$(stat -c %Y "$cache_file" 2>/dev/null || echo 0)
 
-        # Format as HTTP date using busybox-compatible approach
         # HTTP date format: "Sat, 04 Jan 2026 12:34:56 GMT"
         local cache_date=$(date -u -d "@$cache_epoch" "+%a, %d %b %Y %H:%M:%S GMT" 2>/dev/null)
 
         if [ -z "$cache_date" ]; then
           echo "Could not format cache date, assuming stale"
-          return 0  # Stale
+          return 0
         fi
 
         echo "Checking cache freshness (cached: $cache_date)"
 
-        # Make conditional GET request with If-Modified-Since header
         local response=$(${pkgs.wget}/bin/wget -q --spider -S \
           --header="If-Modified-Since: $cache_date" "$url" 2>&1)
 
-        # Check for 304 Not Modified
         if echo "$response" | grep -q "304"; then
-          echo "Cache is up to date (HTTP 304)"
-          return 1  # Fresh
+          echo "Cache is up to date (HTTP 304 Not Modified)"
+          return 1
         else
           echo "Server has newer version"
-          return 0  # Stale
+          return 0
         fi
       }
 
