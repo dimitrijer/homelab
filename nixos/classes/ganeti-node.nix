@@ -120,10 +120,17 @@ in
       };
 
       boot = {
+        # For DHCP in stage 1.
+        initrd = {
+          kernelModules = [ "igc" ];
+          network.udhcpc.extraArgs = [ "-t" "10" "-T" "5" ];
+        };
+
         kernelParams = [
           "console=tty0"
           "console=ttyS1,19200" # serial over LAN
         ];
+
         # TCP optimizations from https://linbit.com/blog/independent-performance-testing-of-drbd-by-e4/.
         kernel.sysctl = {
           "net.ipv4.tcp_slow_start_after_idle" = 0;

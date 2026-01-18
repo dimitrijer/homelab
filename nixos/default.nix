@@ -72,7 +72,7 @@ let
 
   # New HTTP-based netboot builder (downloads store from boot server)
   # cache options: { enable ? true, volumeGroup ? "pool_state", path ? "/var/cache/netboot/store.squashfs" }
-  mkNetbuildHttp = { className, modules, cache ? {} }:
+  mkNetbuildHttp = { className, modules, cache ? { }, httpProxy ? "" }:
     let
       storeUrl = "http://${deployHost}/nixos/by-class/${className}/store.squashfs";
 
@@ -89,18 +89,20 @@ let
               in
               {
                 imports = allModules ++ [
+                  # Allow "nixos-rebuild" to work properly by providing
+                  # /etc/nixos/configuration.nix.
                   (modulesPath + "/profiles/clone-config.nix")
                 ];
                 config = {
                   installer.cloneConfigIncludes = modules;
                   nixpkgs.pkgs = lib.mkDefault pkgs;
                   nixpkgs.localSystem = lib.mkDefault stdenv.hostPlatform;
+                  # Do not require signatures, to allow copying derivations and closures from local store.
                   nix.settings.require-sigs = false;
 
                   netboot-http = {
                     enable = true;
-                    inherit storeUrl;
-                    cache = cache;
+                    inherit storeUrl cache httpProxy;
                   };
                 };
               })
@@ -183,6 +185,20 @@ in
   # Caching is enabled by default (uses /dev/pool_state/var)
   # To disable: cache = { enable = false; };
   # To customize: cache = { volumeGroup = "my_vg"; path = "/var/cache/store.squashfs"; };
+  ganeti-node-http = mkNetbuildHttp {
+    className = "ganeti-node";
+    modules = [
+      ./classes/ganeti-node.nix
+    ];
+    cache = {
+      volumeGroup = "pool_host";
+    };
+    # We can't initialize enp0s31f6 (e1000e) NIC at boot because of some AMT
+    # madness, so we initialize secondary NIC enp3s0 (igc), and use a proxy
+    # to download the squashfs.
+    httpProxy = "http://10.1.97.1:8080";
+  };
+
   calibre-web-http = mkNetbuildHttp {
     className = "calibre-web";
     modules = [ ./classes/calibre-web.nix ];

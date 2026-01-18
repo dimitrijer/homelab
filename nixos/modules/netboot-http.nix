@@ -15,6 +15,13 @@ in
       example = "http://boot.homelab.tel/nixos/by-class/calibre-web/store.squashfs";
     };
 
+    httpProxy = mkOption {
+      type = types.str;
+      default = "";
+      description = "HTTP proxy to be used when downloading squashfs nix store";
+      example = "http://10.1.1.1:8080";
+    };
+
     cache = {
       enable = mkOption {
         type = types.bool;
@@ -82,6 +89,10 @@ in
       STORE_URL="${cfg.storeUrl}"
       CACHE_PATH="/mnt-root${cfg.cache.path}"
       VAR_DEV="/dev/${cfg.cache.volumeGroup}/var"
+
+      if ! [ -z "${cfg.httpProxy}" ]; then
+        export http_proxy="${cfg.httpProxy}"
+      fi
 
       # Function to check if cache is stale using HTTP If-Modified-Since
       is_cache_stale() {
