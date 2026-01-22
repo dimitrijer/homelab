@@ -179,6 +179,12 @@ in
       ./classes/audiobookshelf.nix
     ];
   };
+  jellyfin = mkNetbuild {
+    className = "jellyfin";
+    modules = [
+      ./classes/jellyfin.nix
+    ];
+  };
 
   # HTTP-based netboot builds (store downloaded at boot and cached)
   ganeti-node-http = mkNetbuildHttp {
@@ -207,5 +213,9 @@ in
   audiobookshelf-http = mkNetbuildHttp {
     className = "audiobookshelf";
     modules = [ ./classes/audiobookshelf.nix ];
+  };
+  jellyfin-http = mkNetbuildHttp {
+    className = "jellyfin";
+    modules = [ ./classes/jellyfin.nix ];
   };
 }
