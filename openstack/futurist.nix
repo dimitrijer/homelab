@@ -10,6 +10,7 @@
 , testtools
 , testscenarios
 , eventlet
+, oslo-log
 }:
 
 buildPythonPackage rec {
@@ -43,6 +44,7 @@ buildPythonPackage rec {
     testtools
     testscenarios
     eventlet
+    oslo-log
   ];
 
   checkPhase = ''

@@ -5,4 +5,5 @@
   (import ./ovmf.nix)
   (import ./ghc.nix)
   (import ./drbd.nix)
+  (import ./python.nix)
 ] ++ overlays

@@ -61,6 +61,7 @@ buildPythonPackage rec {
     testtools
     fixtures
     jsonschema
+    oslo-log
   ];
 
   checkPhase = ''

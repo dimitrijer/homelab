@@ -49,6 +49,7 @@ buildPythonPackage rec {
     stestr
     oslotest
     fixtures
+    oslo-log
   ];
 
   checkPhase = ''

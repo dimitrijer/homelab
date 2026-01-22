@@ -18,6 +18,7 @@
 , oslotest
 , testtools
 , fixtures
+, oslo-log
 }:
 
 buildPythonPackage rec {
@@ -59,6 +60,7 @@ buildPythonPackage rec {
     oslotest
     testtools
     fixtures
+    oslo-log
   ];
 
   checkPhase = ''
