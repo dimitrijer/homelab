@@ -6,8 +6,8 @@ self: super: {
           version = "9.2.15";
           src = super.fetchgit {
             url = "https://github.com/LINBIT/drbd.git";
-            rev = "a0bc041dbc27031dfd8b00e7b6a2d2dfdc0c78ce";
-            hash = super.lib.fakeHash;
+            rev = "d3838e6f08d1e56882b8d7265fc9032c2ef8c9cb";
+            hash = "sha256-ijPqeVTBE3bvwKtrHN6NeNg7qx0xBLDqW9dulO/davo=";
           };
           makeFlags = oldAttrs.makeFlags ++ [ "CONFIG_DRBD_COMPAT_84=y" ];
         });
