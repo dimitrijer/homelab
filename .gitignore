@@ -1,4 +1,8 @@
 result*
-ganeti-node
-navidrome
-calibre-web
+./ganeti-node
+./navidrome
+./calibre-web
+./audiobookshelf
+./paperless
+./jellyfin
+./metrics
