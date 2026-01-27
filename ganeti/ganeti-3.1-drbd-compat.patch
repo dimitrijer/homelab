@@ -1,17 +1,19 @@
 diff --git a/lib/storage/drbd.py b/lib/storage/drbd.py
-index 19d7e90d6..bb6ee42c3 100644
+index 19d7e90d6..2495b4214 100644
 --- a/lib/storage/drbd.py
 +++ b/lib/storage/drbd.py
-@@ -138,7 +138,7 @@ class DRBD8(object):
+@@ -138,7 +138,9 @@ class DRBD8(object):
  
      """
      version = info.GetVersion()
 -    if version["k_minor"] <= 3:
-+    if version["k_major"] == 8 and version["k_minor"] <= 3:
++    if version["k_major"] == 9:
++      return drbd_cmdgen.DRBD9CmdGenerator(version)
++    elif version["k_major"] == 8 and version["k_minor"] <= 3:
        return drbd_cmdgen.DRBD83CmdGenerator(version)
      else:
        return drbd_cmdgen.DRBD84CmdGenerator(version)
-@@ -213,12 +213,12 @@ class DRBD8Dev(base.BlockDev):
+@@ -213,15 +215,18 @@ class DRBD8Dev(base.BlockDev):
  
      info = DRBD8.GetProcInfo()
      version = info.GetVersion()
@@ -23,12 +25,78 @@ index 19d7e90d6..bb6ee42c3 100644
                        version["k_major"], version["k_minor"])
  
 -    if version["k_minor"] <= 3:
-+    if version["k_major"] == 8 and version["k_minor"] <= 3:
-       self._show_info_cls = drbd_info.DRBD83ShowInfo
+-      self._show_info_cls = drbd_info.DRBD83ShowInfo
++    if version["k_major"] == 9:
++      self._show_info_cls = drbd_info.DRBD9ShowInfo
      else:
-       self._show_info_cls = drbd_info.DRBD84ShowInfo
+-      self._show_info_cls = drbd_info.DRBD84ShowInfo
++      if version["k_major"] == 8 and version["k_minor"] <= 3:
++        self._show_info_cls = drbd_info.DRBD83ShowInfo
++      else:
++        self._show_info_cls = drbd_info.DRBD84ShowInfo
+ 
+     self._cmd_gen = DRBD8.GetCmdGenerator(info)
+ 
+@@ -317,10 +322,12 @@ class DRBD8Dev(base.BlockDev):
+ 
+   @staticmethod
+   def _NeedsLocalSyncerParams():
+-    # For DRBD >= 8.4, syncer init must be done after local, not in net.
++    # For DRBD >= 8.4 and <9, syncer init must be done after local, not in net.
+     info = DRBD8.GetProcInfo()
+     version = info.GetVersion()
+-    return version["k_minor"] >= 4
++    local_syncer_params = version["k_major"] == 8 and version["k_minor"] >= 4
++    before_peer_setup = not local_syncer_params and version["k_major"] < 9
++    return local_syncer_params, before_peer_setup
+ 
+   def _MatchesLocal(self, info):
+     """Test if our local config matches with an existing device.
+@@ -401,8 +408,8 @@ class DRBD8Dev(base.BlockDev):
+     for cmd in cmds:
+       result = utils.RunCmd(cmd)
+       if result.failed:
+-        base.ThrowError("drbd%d: can't attach local disk: %s",
+-                        minor, result.output)
++        base.ThrowError("drbd%d: can't attach local disk: cmd [%s]: %s",
++                        minor, cmd, result.output)
+ 
+     def _WaitForMinorSyncParams():
+       """Call _SetMinorSyncParams and raise RetryAgain on errors.
+@@ -410,7 +417,8 @@ class DRBD8Dev(base.BlockDev):
+       if self._SetMinorSyncParams(minor, self.params):
+         raise utils.RetryAgain()
+ 
+-    if self._NeedsLocalSyncerParams():
++    local_syncer_params, _ = self._NeedsLocalSyncerParams()
++    if local_syncer_params:
+       # Retry because disk config for DRBD resource may be still uninitialized.
+       try:
+         utils.Retry(_WaitForMinorSyncParams, 1.0, 5.0)
+@@ -453,8 +461,10 @@ class DRBD8Dev(base.BlockDev):
+     # sync speed only after setting up both sides can race with DRBD
+     # connecting, hence we set it here before telling DRBD anything
+     # about its peer.
+-
+-    if not self._NeedsLocalSyncerParams():
++    # N.B. this workaround does not apply to DRBD 9+, because the peer
++    # needs to be configured in order to apply peer device options.
++    local_syncer_params, before_peer_setup = self._NeedsLocalSyncerParams()
++    if not local_syncer_params and before_peer_setup:
+       sync_errors = self._SetMinorSyncParams(minor, self.params)
+       if sync_errors:
+         base.ThrowError("drbd%d: can't set the synchronization parameters: %s" %
+@@ -487,7 +497,7 @@ class DRBD8Dev(base.BlockDev):
+       base.ThrowError("drbd%d: timeout while configuring network", minor)
+ 
+     # Once the assembly is over, try to set the synchronization parameters
+-    if not self._NeedsLocalSyncerParams():
++    if not local_syncer_params:
+       try:
+         # The minor may not have been set yet, requiring us to set it at least
+         # temporarily
 diff --git a/lib/storage/drbd_cmdgen.py b/lib/storage/drbd_cmdgen.py
-index 62e291e5c..54d20e107 100644
+index 62e291e5c..ee6f50071 100644
 --- a/lib/storage/drbd_cmdgen.py
 +++ b/lib/storage/drbd_cmdgen.py
 @@ -243,13 +243,15 @@ class DRBD83CmdGenerator(BaseDRBDCmdGenerator):
@@ -49,11 +117,50 @@ index 62e291e5c..54d20e107 100644
          args.append(option)
        else:
          raise errors.BlockDeviceError("Could not use the option %s as the"
+@@ -349,9 +351,11 @@ class DRBD84CmdGenerator(BaseDRBDCmdGenerator):
+                     dual_pri, hmac, secret, params):
+     cmds = []
+ 
+-    cmds.append(["drbdsetup", "new-resource", self._GetResource(minor)])
+-    cmds.append(["drbdsetup", "new-minor", self._GetResource(minor),
+-                 str(minor), "0"])
++    vmaj = self._version["k_major"]
++    if vmaj == 8:
++      cmds.append(["drbdsetup", "new-resource", self._GetResource(minor)])
++      cmds.append(["drbdsetup", "new-minor", self._GetResource(minor),
++                   str(minor), "0"])
+ 
+     args = ["drbdsetup", "connect", self._GetResource(minor),
+             "%s:%s:%s" % (family, lhost, lport),
+@@ -465,3 +469,14 @@ class DRBD84CmdGenerator(BaseDRBDCmdGenerator):
+       args.append(cls._DISABLE_DISK_OPTION)
+ 
+     return args
++
++
++class DRBD9CmdGenerator(DRBD84CmdGenerator):
++  """Generates drbdsetup commands suited for the DRBD >= 8.4 syntax.
++
++  """
++  def __init__(self, version):
++    super(DRBD9CmdGenerator, self).__init__(version)
++
++  def GenShowCmd(self, minor):
++    return ["drbdsetup", "show", self._GetResource(minor), "--json"]
 diff --git a/lib/storage/drbd_info.py b/lib/storage/drbd_info.py
-index d033e5365..ed499393c 100644
+index d033e5365..c6b710dec 100644
 --- a/lib/storage/drbd_info.py
 +++ b/lib/storage/drbd_info.py
-@@ -165,7 +165,7 @@ class DRBD8Info(object):
+@@ -32,6 +32,8 @@
+ 
+ import errno
+ import re
++import json
++import logging
+ 
+ import pyparsing as pyp
+ 
+@@ -165,7 +167,7 @@ class DRBD8Info(object):
  
    """
  
@@ -62,8 +169,273 @@ index d033e5365..ed499393c 100644
                             r" \(api:(\d+)/proto:(\d+)(?:-(\d+))?\)")
    _VALID_LINE_RE = re.compile("^ *([0-9]+): cs:([^ ]+).*$")
  
+@@ -475,3 +477,60 @@ class DRBD84ShowInfo(BaseShowInfo):
+           if lst[0] == "address":
+             retval["remote_addr"] = tuple(lst[1:])
+     return retval
++
++
++class JsonParser(object):
++  def parseString(self, show_data):
++    try:
++      logging.debug("Show data: {|%s|}", show_data)
++      return json.loads(show_data)
++    except json.JSONDecodeError as err:
++      raise pyp.ParseException("Failed to decode JSON: '%s'" % str(err))
++
++
++class DRBD9ShowInfo(BaseShowInfo):
++
++  _address = BaseShowInfo._ipv4_addr ^ BaseShowInfo._ipv6_addr
++
++  @classmethod
++  def _ParseAddress(cls, address):
++    return address["address"], int(address["port"])
++
++  @classmethod
++  def _ConstructShowParser(cls):
++    return JsonParser()
++
++  @classmethod
++  def _TransformVolumeSection(cls, vol_content, retval):
++    if "backing-disk" in vol_content and \
++        isinstance(vol_content["backing-disk"], str):
++      retval["local_dev"] = vol_content["backing-disk"]
++    if "meta-disk" in vol_content and \
++        isinstance(vol_content["meta-disk"], str):
++      retval["meta_dev"] = vol_content["meta-disk"]
++
++  @classmethod
++  def _TransformParseResult(cls, parse_result):
++    retval = {}
++    if not isinstance(parse_result, list):
++      raise pyp.ParseException("Unexpected json input")
++
++    if len(parse_result) == 1:
++      resource = parse_result[0]
++      if "_this_host" in resource:
++        this_host = resource["_this_host"]
++        if "volumes" in this_host and len(this_host["volumes"]) == 1:
++          cls._TransformVolumeSection(this_host["volumes"][0], retval)
++
++      if "connections" in resource \
++          and len(resource["connections"]) == 1 \
++          and "paths" in resource["connections"][0] \
++          and len(resource["connections"][0]["paths"]) == 1:
++        path = resource["connections"][0]["paths"][0]
++        if "this_host" in path:
++          retval["local_addr"] = cls._ParseAddress(path["this_host"])
++        if "remote_host" in path:
++          retval["remote_addr"] = cls._ParseAddress(path["remote_host"])
++    print("%s" % retval)
++
++    return retval
+diff --git a/test/data/bdev-drbd-9.2-no-disk.txt b/test/data/bdev-drbd-9.2-no-disk.txt
+new file mode 100644
+index 000000000..435045b40
+--- /dev/null
++++ b/test/data/bdev-drbd-9.2-no-disk.txt
+@@ -0,0 +1,17 @@
++[
++    {
++        "resource": "resource1",
++        "options": {
++            "auto-promote": false
++        },
++        "_this_host": {
++            "node-id": 0,
++            "volumes": [
++                {
++                    "volume_nr": 0,
++                    "device_minor": 1
++                }
++            ]
++        }
++    }
++]
+diff --git a/test/data/bdev-drbd-9.2.txt b/test/data/bdev-drbd-9.2.txt
+new file mode 100644
+index 000000000..3080e6a7e
+--- /dev/null
++++ b/test/data/bdev-drbd-9.2.txt
+@@ -0,0 +1,41 @@
++[
++    {
++        "resource": "resource0",
++        "options": {
++            "auto-promote": false
++        },
++        "_this_host": {
++            "node-id": 0,
++            "volumes": [
++                {
++                    "volume_nr": 0,
++                    "device_minor": 0,
++                    "backing-disk": "/dev/pool_gnt/3fa833ca-50b5-46d6-aad2-0b6a13eeaddb.disk0_data",
++                    "meta-disk": "/dev/pool_gnt/3fa833ca-50b5-46d6-aad2-0b6a13eeaddb.disk0_meta",
++                    "disk": {
++                        "size": "20971520s"
++                    }
++                }
++            ]
++        },
++        "connections": [
++            {
++                "path": {
++                    "_this_host": "ipv4 10.1.100.4:11001",
++                    "_remote_host": "ipv4 10.1.100.5:11001"
++                },
++                "net": {
++                    "max-epoch-size": "8092",
++                    "sndbuf-size": "10485760",
++                    "rcvbuf-size": "10485760",
++                    "cram-hmac-alg": "md5",
++                    "after-sb-0pri": "discard-zero-changes",
++                    "after-sb-1pri": "consensus",
++                    "max-buffers": "8092",
++                    "_name": "node1"
++                },
++                "_peer_node_id": 1
++            }
++        ]
++    }
++]
+diff --git a/test/data/bdev-drbd-9.3.txt b/test/data/bdev-drbd-9.3.txt
+new file mode 100644
+index 000000000..e05b1e11f
+--- /dev/null
++++ b/test/data/bdev-drbd-9.3.txt
+@@ -0,0 +1,128 @@
++[
++    {
++        "resource": "resource4",
++        "options": {
++            "cpu-mask": "",
++            "on-no-data-accessible": "io-error",
++            "auto-promote": false,
++            "peer-ack-window": "4096s",
++            "peer-ack-delay": "100",
++            "twopc-timeout": "300",
++            "twopc-retry-timeout": "1",
++            "auto-promote-timeout": "20",
++            "max-io-depth": "8000",
++            "quorum": "off",
++            "on-no-quorum": "suspend-io",
++            "quorum-minimum-redundancy": "off",
++            "on-suspended-primary-outdated": "disconnect",
++            "drbd8-api-compatibility": false
++        },
++        "_this_host": {
++            "node-id": 1,
++            "volumes": [
++                {
++                    "volume_nr": 0,
++                    "device_minor": 4,
++                    "backing-disk": "/dev/pool_gnt/fd6e550e-7b0c-4d69-9c87-dcea40a7ee5e.disk0_data",
++                    "meta-disk": "/dev/pool_gnt/fd6e550e-7b0c-4d69-9c87-dcea40a7ee5e.disk0_meta",
++                    "disk": {
++                        "size": "62914560s",
++                        "on-io-error": "detach",
++                        "disk-barrier": false,
++                        "disk-flushes": true,
++                        "disk-drain": true,
++                        "md-flushes": true,
++                        "resync-after": "-1",
++                        "al-extents": "1237",
++                        "al-updates": true,
++                        "discard-zeroes-if-aligned": true,
++                        "disable-write-same": false,
++                        "disk-timeout": "0",
++                        "read-balancing": "prefer-local",
++                        "rs-discard-granularity": "0",
++                        "bitmap": true,
++                        "max-bio-size": "1048576",
++                        "diskless": "no",
++                        "block-size": "512"
++                    }
++                }
++            ]
++        },
++        "connections": [
++            {
++                "paths": [
++                    {
++                        "this_host": {
++                            "address": "10.1.97.2",
++                            "port": 11029,
++                            "family": "ipv4"
++                        },
++                        "remote_host": {
++                            "address": "10.1.97.4",
++                            "port": 11029,
++                            "family": "ipv4"
++                        }
++                    }
++                ],
++                "_cstate": "Connecting",
++                "net": {
++                    "transport": "",
++                    "load-balance-paths": false,
++                    "protocol": "C",
++                    "timeout": "60",
++                    "max-epoch-size": "20000",
++                    "connect-int": "10",
++                    "ping-int": "10",
++                    "sndbuf-size": "10485760",
++                    "rcvbuf-size": "10485760",
++                    "ko-count": "7",
++                    "allow-two-primaries": false,
++                    "cram-hmac-alg": "md5",
++                    "shared-secret": "06d45e9f54455a276aa2e01472ba11bb53a04486",
++                    "after-sb-0pri": "discard-zero-changes",
++                    "after-sb-1pri": "consensus",
++                    "after-sb-2pri": "disconnect",
++                    "always-asbp": false,
++                    "rr-conflict": "disconnect",
++                    "ping-timeout": "5",
++                    "data-integrity-alg": "",
++                    "tcp-cork": true,
++                    "on-congestion": "block",
++                    "congestion-fill": "0s",
++                    "congestion-extents": "1237",
++                    "csums-alg": "",
++                    "csums-after-crash-only": false,
++                    "verify-alg": "",
++                    "use-rle": true,
++                    "socket-check-timeout": "0",
++                    "fencing": "dont-care",
++                    "max-buffers": "20000",
++                    "allow-remote-read": true,
++                    "tls": false,
++                    "tls-keyring": "(null)",
++                    "tls-privkey": "(null)",
++                    "tls-certificate": "(null)",
++                    "rdma-ctrl-rcvbuf-size": "0",
++                    "rdma-ctrl-sndbuf-size": "0",
++                    "_name": "remote"
++                },
++                "volumes": [
++                    {
++                        "volume_nr": 0,
++                        "disk": {
++                            "resync-rate": "250k",
++                            "c-plan-ahead": "20",
++                            "c-delay-target": "10",
++                            "c-fill-target": "100s",
++                            "c-max-rate": "102400k",
++                            "c-min-rate": "250k",
++                            "bitmap": true,
++                            "resync-without-replication": true
++                        }
++                    }
++                ],
++                "_peer_node_id": 0
++            }
++        ]
++    }
++]
 diff --git a/test/py/legacy/ganeti.storage.drbd_unittest.py b/test/py/legacy/ganeti.storage.drbd_unittest.py
-index da2827042..5302dff53 100755
+index da2827042..8cffabc9e 100755
 --- a/test/py/legacy/ganeti.storage.drbd_unittest.py
 +++ b/test/py/legacy/ganeti.storage.drbd_unittest.py
 @@ -51,6 +51,7 @@ class TestDRBD8(testutils.GanetiTestCase):
@@ -91,3 +463,22 @@ index da2827042..5302dff53 100755
        }
      ]
      for d, r in zip(data, result):
+@@ -190,6 +201,18 @@ class TestDRBD8Runner(testutils.GanetiTestCase):
+                                   ("192.0.2.2", 11000)),
+                     "Wrong network info (8.4.x)")
+ 
++  def testParser93(self):
++    """Test drbdsetup show parser for disk and network version 9.3"""
++    data = testutils.ReadTestData("bdev-drbd-9.3.txt")
++    result = drbd_info.DRBD9ShowInfo.GetDevInfo(data)
++    self.assertTrue(self._has_disk(result, "/dev/pool_gnt/fd6e550e-7b0c-4d69-9c87-dcea40a7ee5e.disk0_data",
++                                   "/dev/pool_gnt/fd6e550e-7b0c-4d69-9c87-dcea40a7ee5e.disk0_meta",
++                                   meta_index=None),
++                    "Wrong local disk info (9.3.x)")
++    self.assertTrue(self._has_net(result, ("10.1.97.2", 11029),
++                                  ("10.1.97.4", 11029)),
++                    "Wrong network info (9.3.x)")
++
+   def testParserNetIP4(self):
+     """Test drbdsetup show parser for IPv4 network"""
+     data = testutils.ReadTestData("bdev-drbd-net-ip4.txt")
