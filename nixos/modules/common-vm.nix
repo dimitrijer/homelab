@@ -16,4 +16,7 @@
     wantedBy = [ "getty.target" ];
     serviceConfig.Restart = "always";
   };
+
+  # Mask systemd-ssh-generator - we don't use AF_VSOCK for SSH access
+  systemd.generators.systemd-ssh-generator = "/dev/null";
 }
