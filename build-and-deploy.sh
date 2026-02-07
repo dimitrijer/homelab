@@ -21,7 +21,7 @@ do
       unlink "$image"
     fi
     echo "Building $image..."
-    nix-build -I . -A "${image}-http" -o "$image"
+    nix-build -I . -A "${image}" -o "$image"
     echo "Deploying $image..."
     "./$image/bin/deploy" ~/.ssh/id_ed25519
     echo "==="
