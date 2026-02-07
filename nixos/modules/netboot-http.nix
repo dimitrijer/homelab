@@ -252,5 +252,21 @@ in
       initrd initrd
       boot
     '';
+
+    # Import store registration so nix-collect-garbage knows about our paths
+    systemd.services.nix-register-store-paths = {
+      description = "Register Nix store paths from netboot image";
+      wantedBy = [ "multi-user.target" ];
+      before = [ "nix-daemon.service" ];
+      after = [ "local-fs.target" ];
+      unitConfig.DefaultDependencies = false;
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
+      script = ''
+        ${pkgs.nix}/bin/nix-store --load-db < /nix/store/nix-path-registration
+      '';
+    };
   };
 }

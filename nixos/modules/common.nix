@@ -60,6 +60,15 @@
   networking.enableIPv6 = false;
   system.stateVersion = config.system.nixos.release;
 
+  # Set NIX_PATH so that ad-hoc nix commands (nix-shell -p, nix-env, etc.) work
+  nix.nixPath = [ "nixpkgs=${pkgs.path}" ];
+
+  # Register current system as a GC root so nix-collect-garbage doesn't nuke it
+  system.activationScripts.gcroot-current-system = ''
+    mkdir -p /nix/var/nix/gcroots
+    ln -sfn /run/current-system /nix/var/nix/gcroots/current-system
+  '';
+
   environment.systemPackages = with pkgs;
     [
       vim
