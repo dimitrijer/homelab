@@ -1,8 +1,9 @@
 result*
-./ganeti-node
-./navidrome
-./calibre-web
-./audiobookshelf
-./paperless
-./jellyfin
-./metrics
+adguard-home
+audiobookshelf
+calibre-web
+ganeti-node
+jellyfin
+metrics
+navidrome
+paperless
