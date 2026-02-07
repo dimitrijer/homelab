@@ -134,11 +134,32 @@ let
       inherit netbuild;
       configuration = sys.config;
       deploy =
+        let
+          localHashFile = "${netbuild}/${targetDir}/store.squashfs.sha256";
+          remoteHashUrl = "http://${deployHost}/nixos/${targetDir}/store.squashfs.sha256";
+        in
         pkgs.writeShellScriptBin "deploy" ''
           if [ $# -ne 1 ]; then
             echo "Supply path to private key as first argument"
             exit 1
           fi
+
+          LOCAL_HASH=$(cat ${localHashFile})
+          REMOTE_HASH=$(${pkgs.curl}/bin/curl -sf "${remoteHashUrl}" 2>/dev/null || echo "")
+
+          if [ "$LOCAL_HASH" = "$REMOTE_HASH" ]; then
+            echo "Hashes match, skipping deploy for ${className}"
+            exit 0
+          fi
+
+          if [ -z "$REMOTE_HASH" ]; then
+            echo "No remote hash found (new deploy or hash file missing)"
+          else
+            echo "Hash mismatch, deploying ${className}"
+            echo "  Local:  $LOCAL_HASH"
+            echo "  Remote: $REMOTE_HASH"
+          fi
+
           ${pkgs.openssh}/bin/scp -i "$1" -r ${netbuild}/${targetDir} ${deployUser}@${deployHost}:${deployPath}
         '';
     };
