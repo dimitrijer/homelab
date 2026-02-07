@@ -185,6 +185,12 @@ in
       ./classes/jellyfin.nix
     ];
   };
+  adguard-home = mkNetbuild {
+    className = "adguard-home";
+    modules = [
+      ./classes/adguard-home.nix
+    ];
+  };
 
   # HTTP-based netboot builds (store downloaded at boot and cached)
   ganeti-node-http = mkNetbuildHttp {
@@ -217,5 +223,9 @@ in
   jellyfin-http = mkNetbuildHttp {
     className = "jellyfin";
     modules = [ ./classes/jellyfin.nix ];
+  };
+  adguard-home-http = mkNetbuildHttp {
+    className = "adguard-home";
+    modules = [ ./classes/adguard-home.nix ];
   };
 }

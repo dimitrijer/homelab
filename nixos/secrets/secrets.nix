@@ -11,7 +11,17 @@ let
 
   jellyfin = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCXHaYN4AW7LOliOtplrYOJjMQSbMzK/5SDoVFedbYKon8CVkfTgQOUhCfasOzUQ0No9JS3ZgpeRNED7t6Y/iGx8pbrslk37MMe68Z4FFfMpldQrNDZTDiQF/4+1hp0vR1fvVDPKNuKdsNUSkO9gkfGd0plnS1+120771O9Pvxd8ayohpz1YOdUjBwm3J2th/LdwwFCQ9vSEXpTfUmC1Mq6FF0zq8GRcwZy07bT9ctpGH4PNuo3wpkrXEZahVvZ8K1M/LV/Ol+gNKKSSjU8LmJn2JXd/TpouiknKTqqifM0RNJQcN2g/ZlttRttKi5u2mfP4lytZ7BlnGUyhR4C2RMu1CnmWK3+IW0Iw35EnoZPTC9bG2fTQ8T2cXPjTorDk0CEkdwohz1r1LSMCLCNUiUAgK0Wj/QcVxj6Dlyro8KI4WRjp9A/LmYHoAZxTuKq6aylRbzzspGCliVXqyozsLz8NSbJpLKWKOwimI0Qv0aqgTZgb1cFEN2DU4GNtGA/v28= root@jellyfin";
 
-  needAcme = [ navidrome calibre-web metrics paperless audiobookshelf jellyfin ];
+  adguard-home = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDJV47lkbAxKJI2xcgHdcRDpeAN34tIhpUxpXqDggvyNfdwwL4DPcS2YhIw3KJJwqU+5ZzjhVTqz00brjwV1HLbc+L2SXGoVF/VeqtnFd29/5yzSsAUtwTZz1VCPSS+ye8iyD4t9NCWfyvmkRgRM1NmaxeM+FN8r1Hmw9IvhEz37FSs8MPD8gJQQs9a4/BMMCwaztVNoXBsF+k3PNZUt7+T1oZrghXHmgcM2F8is5ibdGYfbkJltYbiDpNTCMqy0DXpYu0lIgJyAzWTT3XikT5yyYdAXhcmomxRzpYFahRleryHvQwSmj2VA0sONtgwVATR9wlUCV+/mouk91m7LHj99WKhsgyyYQEQLWfZtqRpEOfcUhZTJBqEVsKIwbNbdvf07yZFNnBhq1gXepgfYh6O3yGLKfxVocMswpGos6MGDH+tJE6Y2/PqlgZp3JmNjjOkmPFygZUG+oSLSRa0sLSzLybixPQ1LxKIMrWgDTqFJNQZ3ipKMytCFIg/80qd5yM= root@adguard-home";
+
+  needAcme = [
+    navidrome
+    calibre-web
+    metrics
+    paperless
+    audiobookshelf
+    jellyfin
+    adguard-home
+  ];
 in
 {
   "namecheap.ini.age".publicKeys = needAcme;
