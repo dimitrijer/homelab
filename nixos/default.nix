@@ -116,6 +116,7 @@ let
       netbuild =
         pkgs.stdenv.mkDerivation {
           name = "netbuild-http-${className}";
+          nativeBuildInputs = [ pkgs.coreutils ];
           unpackPhase = "true";
 
           installPhase = ''
@@ -124,6 +125,7 @@ let
             cp ${build.kernel}/bzImage $dstdir/bzImage
             cp ${build.initialRamdisk}/initrd $dstdir/initrd
             cp ${build.squashfsStore} $dstdir/store.squashfs
+            sha256sum $dstdir/store.squashfs | cut -d' ' -f1 > $dstdir/store.squashfs.sha256
             cp ${build.netbootIpxeScript}/netboot.ipxe $dstdir/ipxe
           '';
         };

@@ -40,6 +40,18 @@ in
         default = "/var/cache/netboot/store.squashfs";
         description = "Path within the filesystem to cache the squashfs";
       };
+
+      hashPath = mkOption {
+        type = types.str;
+        default = "/var/cache/netboot/store.squashfs.sha256";
+        description = "Path within the filesystem to cache the squashfs hash";
+      };
+    };
+
+    hashUrl = mkOption {
+      type = types.str;
+      default = "";
+      description = "URL to download the squashfs hash from (defaults to storeUrl + .sha256)";
     };
 
     storeContents = mkOption {
@@ -87,39 +99,50 @@ in
       echo "=== HTTP Netboot: Starting store setup ==="
 
       STORE_URL="${cfg.storeUrl}"
+      HASH_URL="${if cfg.hashUrl != "" then cfg.hashUrl else cfg.storeUrl + ".sha256"}"
       CACHE_PATH="/mnt-root${cfg.cache.path}"
+      HASH_CACHE_PATH="/mnt-root${cfg.cache.hashPath}"
       VAR_DEV="/dev/${cfg.cache.volumeGroup}/var"
 
       if ! [ -z "${cfg.httpProxy}" ]; then
         export http_proxy="${cfg.httpProxy}"
       fi
 
-      # Function to check if cache is stale using HTTP If-Modified-Since
+      # Function to check if cache is stale using hash comparison
       # Returns 0 for stale, and 1 for fresh.
       is_cache_stale() {
         local cache_file="$1"
-        local url="$2"
+        local hash_cache="$2"
+        local hash_url="$3"
 
-        local cache_epoch=$(stat -c %Y "$cache_file" 2>/dev/null || echo 0)
-
-        # HTTP date format: "Sat, 04 Jan 2026 12:34:56 GMT"
-        local cache_date=$(date -u -d "@$cache_epoch" "+%a, %d %b %Y %H:%M:%S GMT" 2>/dev/null)
-
-        if [ -z "$cache_date" ]; then
-          echo "Could not format cache date, assuming stale"
+        # If cache file doesn't exist, it's stale
+        if [ ! -f "$cache_file" ]; then
+          echo "Cache file does not exist"
           return 0
         fi
 
-        echo "Checking cache freshness (cached: $cache_date)"
+        # If local hash doesn't exist, it's stale
+        if [ ! -f "$hash_cache" ]; then
+          echo "Local hash file does not exist"
+          return 0
+        fi
 
-        local response=$(${pkgs.wget}/bin/wget -q --spider -S \
-          --header="If-Modified-Since: $cache_date" "$url" 2>&1)
+        # Fetch remote hash
+        local remote_hash=$(${pkgs.wget}/bin/wget -q -O - "$hash_url" 2>/dev/null)
+        if [ -z "$remote_hash" ]; then
+          echo "Failed to fetch remote hash, assuming stale"
+          return 0
+        fi
 
-        if echo "$response" | grep -q "304"; then
-          echo "Cache is up to date (HTTP 304 Not Modified)"
+        local local_hash=$(cat "$hash_cache" 2>/dev/null)
+
+        echo "Comparing hashes: local=$local_hash remote=$remote_hash"
+
+        if [ "$local_hash" = "$remote_hash" ]; then
+          echo "Hashes match, cache is fresh"
           return 1
         else
-          echo "Server has newer version"
+          echo "Hashes differ, cache is stale"
           return 0
         fi
       }
@@ -128,6 +151,12 @@ in
         mkdir -p "$(dirname "$CACHE_PATH")"
         if ${pkgs.wget}/bin/wget -q -O "$CACHE_PATH" "$STORE_URL"; then
           echo "Download to cache complete, size: $(du -h "$CACHE_PATH" | cut -f1)"
+          # Save the hash file
+          if ${pkgs.wget}/bin/wget -q -O "$HASH_CACHE_PATH" "$HASH_URL"; then
+            echo "Hash file saved"
+          else
+            echo "Warning: Failed to save hash file"
+          fi
           TARGET_SQUASHFS="$CACHE_PATH"
           return 0
         else
@@ -167,17 +196,12 @@ in
         fi
 
         if [ "$CACHE_AVAILABLE" = "true" ]; then
-          if [ -f "$CACHE_PATH" ]; then
-            if is_cache_stale "$CACHE_PATH" "$STORE_URL"; then
-              echo "Cache is stale, re-downloading to $CACHE_PATH"
-              download_to_cache || download_to_tmpfs
-            else
-              echo "Using cached store at $CACHE_PATH"
-              TARGET_SQUASHFS="$CACHE_PATH"
-            fi
-          else
-            echo "No cache found, downloading to $CACHE_PATH"
+          if is_cache_stale "$CACHE_PATH" "$HASH_CACHE_PATH" "$HASH_URL"; then
+            echo "Cache is stale or missing, downloading to $CACHE_PATH"
             download_to_cache || download_to_tmpfs
+          else
+            echo "Using cached store at $CACHE_PATH"
+            TARGET_SQUASHFS="$CACHE_PATH"
           fi
         else
           echo "No persistent storage, downloading to tmpfs"
