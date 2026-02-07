@@ -27,12 +27,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a Nix-based project using traditional `nix-build` (not flakes). All builds are pure and reproducible.
 
-### Building Images
+### Building and Deploying Images
+
+The easiest way to build and deploy images is with `build-and-deploy.sh`:
 
 ```bash
-# Build all classes (ganeti-node, navidrome, calibre-web, etc.)
-nix-build
+# Build and deploy all images
+./build-and-deploy.sh
 
+# Build and deploy specific image(s)
+./build-and-deploy.sh ganeti-node
+./build-and-deploy.sh jellyfin navidrome
+```
+
+Available images: `adguard-home`, `audiobookshelf`, `calibre-web`, `ganeti-node`, `jellyfin`, `metrics`, `navidrome`, `paperless`.
+
+For more control, use `nix-build` directly:
+
+```bash
 # Build specific class netboot image
 nix-build -A ganeti-node.netbuild
 nix-build -A navidrome.netbuild
@@ -364,12 +376,19 @@ When updating nixpkgs:
 }
 ```
 
-3. Build and deploy:
+3. Add to `build-and-deploy.sh` `ALL_IMAGES` array:
 
 ```bash
-nix-build -A myservice.netbuild
-nix-build -A myservice.deploy
-./result/bin/deploy ~/.ssh/key
+ALL_IMAGES=(
+    # ... existing images
+    myservice
+)
+```
+
+4. Build and deploy:
+
+```bash
+./build-and-deploy.sh myservice
 ```
 
 ### Adding a Node to the Cluster
