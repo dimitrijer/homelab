@@ -173,6 +173,7 @@ rec {
     ./ganeti-3.1-pandoc-3.6-man-rst.patch
     ./ganeti-3.1-drbd-compat.patch
     ./ganeti-3.1-ovn.patch
+    ./ganeti-3.1-disable-ssh-sandbox-pytests.patch
   ];
 
   preConfigure = ''

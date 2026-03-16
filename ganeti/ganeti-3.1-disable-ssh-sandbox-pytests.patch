@@ -1,0 +1,21 @@
+diff --git a/test/py/legacy/ganeti.backend_unittest.py b/test/py/legacy/ganeti.backend_unittest.py
+index 5a1e4f2..9b3c0e1 100755
+--- a/test/py/legacy/ganeti.backend_unittest.py
++++ b/test/py/legacy/ganeti.backend_unittest.py
+@@ -974,6 +974,7 @@ class TestSpaceReportingConstants(unittest.TestCase):
+       self.assertEqual(None, backend._STORAGE_TYPE_INFO_FN[storage_type])
+
+
++@unittest.skip("Incompatible with Nix build sandbox: home dir lookup fails")
+ class TestAddRemoveGenerateNodeSshKey(testutils.GanetiTestCase):
+
+   _CLUSTER_NAME = "mycluster"
+@@ -1959,6 +1960,7 @@ class TestAddRemoveGenerateNodeSshKey(testutils.GanetiTestCase):
+     self.assertTrue([error_msg for (node, error_msg) in error_msgs
+                      if node == node_name])
+
+
++@unittest.skip("Incompatible with Nix build sandbox: home dir lookup fails")
+ class TestVerifySshSetup(testutils.GanetiTestCase):
+
+   _NODE1_UUID = "uuid1"
