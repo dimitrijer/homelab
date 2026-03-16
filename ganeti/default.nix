@@ -179,6 +179,12 @@ rec {
     echo "${ganetiRev}" > vcs-version
     patchShebangs ./autotools ./daemons ./tools
 
+    # Remove any stale pre-generated hsc2hs output from the local source tree.
+    # Cabal skips hsc2hs preprocessing when dist/ already contains generated
+    # files, so stale artifacts from a previous local build would be used
+    # instead of being regenerated from the current .hsc sources.
+    rm -rf dist
+
     substituteInPlace ./Makefile.am \
       --replace "pytest-3" "pytest"
   '';
