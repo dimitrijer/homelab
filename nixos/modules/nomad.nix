@@ -163,7 +163,7 @@ in
 
       # nomad-driver-virt needs iptables for VM network setup;
       # iproute2 needed for network fingerprinting
-      path = with pkgs; [ iptables iproute2 qemu-utils qemu ];
+      path = with pkgs; [ iptables iproute2 qemu-utils ];
 
       serviceConfig = {
         ExecStart = "${cfg.package}/bin/nomad agent -config=/etc/nomad.d -config=/var/lib/nomad/runtime.hcl";
