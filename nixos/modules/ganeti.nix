@@ -201,10 +201,6 @@ in
           package = pkgs.qemu;
           runAsRoot = true;
           swtpm.enable = true;
-          ovmf = {
-            enable = true;
-            packages = [ pkgs.OVMF.fd ];
-          };
         };
       };
       systemd.sockets = mkIf cfg.libvirtEnabled {
