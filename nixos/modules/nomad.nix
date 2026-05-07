@@ -21,7 +21,14 @@ let
         emulator {
           uri = "qemu:///system"
         }
-        image_paths = ["/var/lib/libvirt/images"]
+        ${optionalString (cfg.sharedDataDir != null) ''
+        shared_data_dir = "${cfg.sharedDataDir}"
+        ''}
+        ${optionalString (cfg.ovnNBConnection != null) ''
+        ovn {
+          nb_connection = "${cfg.ovnNBConnection}"
+        }
+        ''}
       }
     }
   '';
@@ -103,6 +110,24 @@ in
       default = false;
       description = "Open firewall ports for Nomad";
     };
+
+    ovnNBConnection = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = "OVN northbound database connection string (e.g. tcp:10.1.100.5:6641)";
+    };
+
+    nfsImageStore = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = "NFS server path for shared VM storage (e.g. 10.1.100.1:/export/virt)";
+    };
+
+    sharedDataDir = mkOption {
+      type = types.nullOr types.str;
+      default = if cfg.nfsImageStore != null then "/var/lib/virt-shared" else null;
+      description = "Local mount point for shared NFS storage; set automatically when nfsImageStore is configured";
+    };
   };
 
   config = mkIf cfg.enable {
@@ -123,6 +148,17 @@ in
     '';
 
     environment.etc."nomad.d/base.hcl".source = baseConfig;
+
+    # Mount NFS share for shared VM storage
+    boot.supportedFilesystems = mkIf (cfg.nfsImageStore != null) [ "nfs" ];
+
+    fileSystems = mkIf (cfg.nfsImageStore != null) {
+      "${cfg.sharedDataDir}" = {
+        device = cfg.nfsImageStore;
+        fsType = "nfs";
+        options = [ "nfsvers=4" "soft" "timeo=30" ];
+      };
+    };
 
     # Generate runtime config with advertise addresses from cluster config
     systemd.services.nomad-config = {
@@ -162,14 +198,17 @@ in
       wants = [ "network-online.target" ];
 
       # nomad-driver-virt needs iptables for VM network setup;
-      # iproute2 needed for network fingerprinting
-      path = with pkgs; [ iptables iproute2 qemu-utils ];
+      # iproute2 needed for network fingerprinting;
+      # qemu-utils needed for qemu-img (blank disk creation)
+      path = with pkgs; [ iptables iproute2 qemu-utils ovn ];
 
       serviceConfig = {
         ExecStart = "${cfg.package}/bin/nomad agent -config=/etc/nomad.d -config=/var/lib/nomad/runtime.hcl";
         KillMode = "process";
         LimitNOFILE = 65536;
         Restart = "on-failure";
+      } // optionalAttrs (cfg.nfsImageStore != null) {
+        RequiresMountsFor = cfg.sharedDataDir;
       };
 
       wantedBy = [ "multi-user.target" ];
