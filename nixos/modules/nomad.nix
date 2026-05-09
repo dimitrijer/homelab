@@ -156,10 +156,23 @@ in
       "${cfg.sharedDataDir}" = {
         device = cfg.nfsImageStore;
         fsType = "nfs";
-        # _netdev + x-systemd.requires=network-online.target so the mount unit
-        # waits for networking; without this systemd-fstab-generator schedules
-        # it too early and mount.nfs sees "Network is unreachable".
-        options = [ "nfsvers=4" "soft" "timeo=30" "_netdev" "x-systemd.requires=network-online.target" ];
+        # _netdev tells systemd-fstab-generator this is a network mount.
+        # We explicitly depend on stage 2's systemd-networkd-wait-online
+        # rather than network-online.target because the latter is activated
+        # in initrd (by netboot-fetch-store), inherited as already-active by
+        # stage 2 systemd, and therefore satisfies Requires= vacuously —
+        # before stage 2 networkd has even started bringing up br0. With
+        # br0 carrying RequiredForOnline=routable, waiting on stage 2's
+        # wait-online ensures DHCPv4 + default route are in place before
+        # mount.nfs tries to reach 192.168.87.1.
+        options = [
+          "nfsvers=4"
+          "soft"
+          "timeo=30"
+          "_netdev"
+          "x-systemd.requires=systemd-networkd-wait-online.service"
+          "x-systemd.after=systemd-networkd-wait-online.service"
+        ];
       };
     };
 

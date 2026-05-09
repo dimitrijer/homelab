@@ -181,6 +181,14 @@ in
             DHCP = "yes";
             KeepConfiguration = "no";
           };
+          # Make systemd-networkd-wait-online block until br0 has a routable
+          # IPv4 (i.e. DHCPv4 completed and default route installed).
+          # enp0s31f6 is in wait-online.ignoredInterfaces above (Intel ME
+          # SOL/IDER blocks the e1000e PHY for several seconds at boot), so
+          # without this br0 would only need link-local, network-online.target
+          # would fire before DHCP, and anything that needs the default route
+          # (e.g. NFS mount of 192.168.87.1:…) races and fails.
+          linkConfig.RequiredForOnline = "routable";
           domains = [ "~${cfg.domain}" ];
         };
       };
