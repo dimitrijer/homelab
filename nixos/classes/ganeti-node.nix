@@ -136,9 +136,9 @@ in
         initrd = {
           kernelModules = [ "igc" ];
 
-          # The NIC needs a bit of time to initialize, so do a few more
-          # DHCP retries, with more time in between.
-          network.udhcpc.extraArgs = [ "-t" "10" "-T" "5" ];
+          # NIC takes time to initialize. systemd-networkd retries DHCP with
+          # backoff automatically; the netboot module bumps
+          # systemd-networkd-wait-online's --timeout to cover it.
         };
 
         kernelParams = [
@@ -173,7 +173,7 @@ in
       documentation = {
         enable = true;
         man = {
-          generateCaches = false;
+          cache.enable = false;
           enable = true;
         };
       };

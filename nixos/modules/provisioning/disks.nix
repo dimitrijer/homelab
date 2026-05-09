@@ -35,10 +35,9 @@ in
 
     systemd.services."provision-disks" = {
       description = "Provision and/or mount disks";
-      before = [ "local-fs.target" "systemd-journald.service" ];
+      before = [ "local-fs.target" ];
       wants = [ "local-fs-pre.target" ];
-      after = [ "local-fs-pre.target" "systemd-udev-settle.service" ];
-      requires = [ "systemd-udev-settle.service" ];
+      after = [ "local-fs-pre.target" ];
       serviceConfig = {
         "StandardOutput" = "file:/dev/kmsg";
         "StandardError" = "file:/dev/kmsg";
@@ -51,6 +50,7 @@ in
         disko-fmt
         disko-mnt
         kmod # for modprobe
+        systemd # for udevadm
       ];
       script =
         let
@@ -67,6 +67,7 @@ in
           set -eu -o pipefail
 
           echo "Waiting for disks to settle..."
+          udevadm settle
           sleep 5
 
           echo "Scanning for VGs..."
@@ -114,7 +115,7 @@ in
       serviceConfig = {
         Type = "oneshot";
       };
-      requiredBy = [ "local-fs.target" "systemd-journald.service" ];
+      requiredBy = [ "local-fs.target" ];
     };
 
     environment.systemPackages = with pkgs;

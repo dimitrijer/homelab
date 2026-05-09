@@ -19,7 +19,7 @@ let
             ({ modulesPath, ... }:
               let
                 allModules = modules ++ [
-                  ./modules/netboot-http.nix
+                  ./modules/netboot-nixpkgs-systemd.nix
                 ];
               in
               {

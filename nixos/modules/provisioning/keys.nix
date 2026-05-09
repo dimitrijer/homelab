@@ -36,7 +36,13 @@ in
           trap "rm -rf $target_dir" EXIT
           cd $target_dir
 
-          curl -sLO "http://boot.homelab.tel${cfg.baseUrl}/$HOSTNAME.tar.gz"
+          # The primary NIC (e1000e) on ganeti nodes can be "reset blocked by
+          # ME" briefly after stage 2 transition. Retry hard so a transient
+          # NIC issue doesn't fail the service — if provision-keys exits
+          # non-zero, sshd's Requires= dep fails and systemd does NOT re-queue
+          # sshd when provision-keys later recovers.
+          curl --fail --retry 60 --retry-delay 5 --retry-connrefused --retry-all-errors -sLO \
+            "http://boot.homelab.tel${cfg.baseUrl}/$HOSTNAME.tar.gz"
           umask 077
           tar -xzvf $HOSTNAME.tar.gz
           cp host_privkey $host_key_path
@@ -54,6 +60,10 @@ in
 
       serviceConfig = {
         Type = "oneshot";
+        # Stay "active (exited)" after success so that systemd-analyze
+        # critical-chain can attribute waiting time to this service and
+        # `systemctl status` shows a sensible state.
+        RemainAfterExit = true;
         User = "root";
         Group = "root";
         Restart = "on-failure";

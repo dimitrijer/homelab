@@ -84,7 +84,7 @@ in
       defaults = {
         email = "templaryum@gmail.com";
         dnsProvider = "namecheap";
-        credentialsFile = config.age.secrets.namecheap-ini.path;
+        environmentFile = config.age.secrets.namecheap-ini.path;
         # Cannot use system resolver since it's going to resolve to local addresses.
         dnsResolver = "1.1.1.1:53";
       };

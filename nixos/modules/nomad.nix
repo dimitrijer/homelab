@@ -156,7 +156,10 @@ in
       "${cfg.sharedDataDir}" = {
         device = cfg.nfsImageStore;
         fsType = "nfs";
-        options = [ "nfsvers=4" "soft" "timeo=30" ];
+        # _netdev + x-systemd.requires=network-online.target so the mount unit
+        # waits for networking; without this systemd-fstab-generator schedules
+        # it too early and mount.nfs sees "Network is unreachable".
+        options = [ "nfsvers=4" "soft" "timeo=30" "_netdev" "x-systemd.requires=network-online.target" ];
       };
     };
 
