@@ -5,7 +5,7 @@
 , makeWrapper
 , breakpointHook
 , ghc
-, python311 # asyncore was removed in 3.12
+, python3
 , coreutils
 , util-linux
 , procps
@@ -36,7 +36,7 @@
 
 let
   pythonWithPackages =
-    python311.withPackages
+    python3.withPackages
       (ps: with ps; [
         pyopenssl
         simplejson
@@ -174,6 +174,7 @@ rec {
     ./ganeti-3.1-drbd-compat.patch
     ./ganeti-3.1-ovn.patch
     ./ganeti-3.1-disable-ssh-sandbox-pytests.patch
+    ./ganeti-3.1-pytest-unit-conftest.patch
   ];
 
   preConfigure = ''

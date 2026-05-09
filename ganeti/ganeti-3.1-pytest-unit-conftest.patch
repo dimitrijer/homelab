@@ -1,0 +1,27 @@
+diff --git a/test/py/unit/conftest.py b/test/py/unit/conftest.py
+new file mode 100644
+index 000000000..5c9852209
+--- /dev/null
++++ b/test/py/unit/conftest.py
+@@ -0,0 +1,21 @@
++"""Shared pytest fixtures for unit tests."""
++
++from unittest import mock
++
++import pytest
++
++from ganeti import runtime
++
++
++@pytest.fixture(autouse=True)
++def _stub_runtime_getents(monkeypatch):
++  """Bypass system user/group resolution in unit tests.
++
++  Several Ganeti modules call runtime.GetEnts() during construction (e.g.
++  daemon.Mainloop), which in turn calls pwd.getpwnam() for the gnt-* users.
++  Those users only exist after Ganeti is installed on a real system, not in
++  sandboxed test environments.
++
++  """
++  monkeypatch.setattr(runtime, "GetEnts", lambda *_a, **_kw: mock.MagicMock())
++  monkeypatch.setattr(runtime, "_priv", None)

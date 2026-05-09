@@ -5,29 +5,13 @@ index 02fd0a478..9589a568b 100644
 @@ -23,9 +23,6 @@ comma := ,
  # Helper function to strip src/ and test/hs/ from a list
  strip_hsroot = $(patsubst src/%,%,$(patsubst test/hs/%,%,$(1)))
- 
+
 -# Use bash in order to be able to use pipefail
 -SHELL=/bin/bash
 -
  EXTRA_DIST=
- 
+
  # Enable colors in shelltest
-@@ -1935,7 +1932,6 @@ python_tests_legacy = \
- 	test/py/legacy/cmdlib/test_unittest.py \
- 	test/py/legacy/cfgupgrade_unittest.py \
- 	test/py/legacy/docs_unittest.py \
--	test/py/legacy/ganeti.asyncnotifier_unittest.py \
- 	test/py/legacy/ganeti.backend_unittest-runasroot.py \
- 	test/py/legacy/ganeti.backend_unittest.py \
- 	test/py/legacy/ganeti.bootstrap_unittest.py \
-@@ -1948,7 +1944,6 @@ python_tests_legacy = \
- 	test/py/legacy/ganeti.confd.client_unittest.py \
- 	test/py/legacy/ganeti.config_unittest.py \
- 	test/py/legacy/ganeti.constants_unittest.py \
--	test/py/legacy/ganeti.daemon_unittest.py \
- 	test/py/legacy/ganeti.errors_unittest.py \
- 	test/py/legacy/ganeti.hooks_unittest.py \
- 	test/py/legacy/ganeti.ht_unittest.py \
 @@ -1992,7 +1987,6 @@ python_tests_legacy = \
  	test/py/legacy/ganeti.storage.filestorage_unittest.py \
  	test/py/legacy/ganeti.storage.gluster_unittest.py \
@@ -38,7 +22,7 @@ index 02fd0a478..9589a568b 100644
  	test/py/legacy/ganeti.uidpool_unittest.py \
 @@ -2874,9 +2868,6 @@ dist-release: dist
  	done
- 
+
  install-exec-local:
 -	@mkdir_p@ "$(DESTDIR)${localstatedir}/lib/ganeti" \
 -	  "$(DESTDIR)${localstatedir}/log/ganeti" \
@@ -52,6 +36,6 @@ index 02fd0a478..9589a568b 100644
  .PHONY: really-all
 -really-all: all $(check_SCRIPTS) $(haskell_tests) $(HS_ALL_PROGS)
 +really-all: all $(check_SCRIPTS) $(haskell_tests) $(HS_ALL_PROGS) $(BUILT_EXAMPLES)
- 
+
  # we don't need the ancient implicit rules:
  %: %,v
