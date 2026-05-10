@@ -175,6 +175,7 @@ rec {
     ./ganeti-3.1-ovn.patch
     ./ganeti-3.1-disable-ssh-sandbox-pytests.patch
     ./ganeti-3.1-pytest-unit-conftest.patch
+    ./ganeti-3.1-network-mode-openvswitch-rename.patch
   ];
 
   preConfigure = ''
