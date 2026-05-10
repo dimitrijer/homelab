@@ -19,6 +19,10 @@ in
       server = {
         inherit domain;
       };
+      # Hard-coded former upstream default. Existing DB was encrypted with
+      # this key; rotating would require the 3rd-party re-encryption tool
+      # since 26.05 dropped the default with no in-tree migration path.
+      security.secret_key = "SW2YcwTIb9zpOOhoPsMm";
     };
   };
 
