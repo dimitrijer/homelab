@@ -1,12 +1,1414 @@
-diff --git a/tools/net-common.in b/tools/net-common.in
-index dacca411a..6238a6a3a 100644
---- a/tools/net-common.in
-+++ b/tools/net-common.in
-@@ -173,6 +173,7 @@ function setup_ovs {
-     TRUNKS=${TRUNKS#:}  # remove leading ':', if still present
-     [ -n "$TRUNKS" ] && ovs-vsctl set port $INTERFACE trunks=${TRUNKS//:/,}
+diff --git a/Makefile.am b/Makefile.am
+index cb248beb7..e76c5e9be 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -113,11 +113,13 @@ iallocatorsdir = $(pkglibdir)/iallocators
+ pytoolsdir = $(pkgpythondir)/tools
+ docdir = $(versiondir)$(datadir)/doc/$(PACKAGE)
+ ifupdir = $(sysconfdir)/ganeti
+-NET_MODES = bridged ovs routed
++NET_MODES = bridged ovs ovn routed
  
-+    ovs-vsctl set interface $INTERFACE external-ids:iface-id="$INSTANCE"
-   fi
- }
+ NET_SCRIPT_LIST = \
+ 	tools/net-bridged-down \
+ 	tools/net-bridged-up \
++	tools/net-ovn-down \
++	tools/net-ovn-up \
+ 	tools/net-ovs-down \
+ 	tools/net-ovs-up \
+ 	tools/net-routed-down \
+@@ -133,6 +135,7 @@ SYMLINK_TARGET_DIRS = \
+ 	$(sysconfdir)/ganeti \
+ 	$(libdir)/ganeti/iallocators \
+ 	$(libdir)/ganeti/network/bridged \
++	$(libdir)/ganeti/network/ovn \
+ 	$(libdir)/ganeti/network/ovs \
+ 	$(libdir)/ganeti/network/routed \
+ 	$(libdir)/ganeti/tools \
+@@ -671,7 +674,8 @@ hypervisor_PYTHON = \
+ 	lib/hypervisor/hv_chroot.py \
+ 	lib/hypervisor/hv_fake.py \
+ 	lib/hypervisor/hv_lxc.py \
+-	lib/hypervisor/hv_xen.py
++	lib/hypervisor/hv_xen.py \
++	lib/hypervisor/ovn_helper.py
  
+ hypervisor_hv_kvm_PYTHON = \
+ 	lib/hypervisor/hv_kvm/__init__.py \
+diff --git a/lib/client/gnt_network.py b/lib/client/gnt_network.py
+index 58e7643a0..131b11626 100644
+--- a/lib/client/gnt_network.py
++++ b/lib/client/gnt_network.py
+@@ -129,12 +129,15 @@ def ConnectNetwork(opts, args):
+ 
+   # TODO: Change logic to support "--submit"
+   for group in groups:
+-    op = opcodes.OpNetworkConnect(group_name=group,
+-                                  network_name=network,
+-                                  network_mode=nicparams[constants.NIC_MODE],
+-                                  network_link=nicparams[constants.NIC_LINK],
+-                                  network_vlan=nicparams[constants.NIC_VLAN],
+-                                  conflicts_check=opts.conflicts_check)
++    op = opcodes.OpNetworkConnect(
++        group_name=group,
++        network_name=network,
++        network_mode=nicparams[constants.NIC_MODE],
++        network_link=nicparams[constants.NIC_LINK],
++        network_vlan=nicparams[constants.NIC_VLAN],
++        network_ovn_logical_switch=nicparams[constants.NIC_OVN_LOGICAL_SWITCH],
++        network_ovn_dhcpv4_options=nicparams[constants.NIC_OVN_DHCPV4_OPTIONS],
++        conflicts_check=opts.conflicts_check)
+     SubmitOpCode(op, opts=opts, cl=cl)
+ 
+ 
+@@ -174,8 +177,11 @@ def ListNetworks(opts, args):
+   fmtoverride = {
+     "group_list":
+       (lambda data:
+-        utils.CommaJoin("%s (%s, %s, %s)" % (name, mode, link, vlan)
+-                        for (name, mode, link, vlan) in data),
++        utils.CommaJoin("%s (%s, %s, %s, %s, %s)" % (name, mode, link, vlan,
++                                             ovn_logical_switch,
++                                             ovn_dhcpv4_options)
++                        for (name, mode, link, vlan, ovn_logical_switch,
++                ovn_dhcpv4_options) in data),
+        False),
+     "inst_list": (",".join, False),
+     "tags": (",".join, False),
+@@ -256,9 +262,9 @@ def ShowNetworkConfig(_, args):
+ 
+     if group_list:
+       ToStdout("  connected to node groups:")
+-      for group, nic_mode, nic_link, nic_vlan in group_list:
+-        ToStdout("    %s (mode:%s link:%s vlan:%s)",
+-                 group, nic_mode, nic_link, nic_vlan)
++      for group, nic_mode, nic_link, nic_vlan, ovn_logical_switch, ovn_dhcpv4_options in group_list:
++        ToStdout("    %s (mode:%s link:%s vlan:%s ovn_ls:%s ovn_dhcp:%s)",
++                 group, nic_mode, nic_link, nic_vlan, ovn_logical_switch, ovn_dhcpv4_options)
+     else:
+       ToStdout("  not connected to any node group")
+ 
+diff --git a/lib/cmdlib/instance_create.py b/lib/cmdlib/instance_create.py
+index a0f49dcd8..cc5601f8c 100644
+--- a/lib/cmdlib/instance_create.py
++++ b/lib/cmdlib/instance_create.py
+@@ -38,6 +38,7 @@ from ganeti import compat
+ from ganeti import constants
+ from ganeti import errors
+ from ganeti import hypervisor
++from ganeti.hypervisor import ovn_helper
+ from ganeti import locking
+ from ganeti.masterd import iallocator
+ from ganeti import masterd
+@@ -1520,6 +1521,20 @@ class LUInstanceCreate(LogicalUnit):
+     for disk in disks:
+       self.cfg.AddInstanceDisk(iobj.uuid, disk, replace=self.op.commit)
+ 
++    # Create OVN logical switch ports for OVN-mode NICs
++    nb_connection = self.hv_full.get(constants.HV_OVN_NB_CONNECTION)
++
++    for nic_idx, nic in enumerate(iobj.nics):
++      if nic.nicparams.get(constants.NIC_MODE) == constants.NIC_MODE_OVN:
++        try:
++          feedback_fn("* creating OVN port for NIC %d" % nic_idx)
++          ovn_helper.CreateOVNPort(iobj, nic_idx, nic, nb_connection)
++        except Exception as err:
++          logging.error("Failed to create OVN port for NIC %d: %s",
++                        nic_idx, err)
++          raise errors.OpExecError("Failed to create OVN port for NIC %d: %s" %
++                                   (nic_idx, err))
++
+     if self.op.forthcoming:
+       feedback_fn("Instance is forthcoming; not creating the actual instance")
+       return self.cfg.GetNodeNames(list(self.cfg.GetInstanceNodes(iobj.uuid)))
+diff --git a/lib/cmdlib/instance_migration.py b/lib/cmdlib/instance_migration.py
+index 58c91591d..699d815cb 100644
+--- a/lib/cmdlib/instance_migration.py
++++ b/lib/cmdlib/instance_migration.py
+@@ -37,6 +37,7 @@ from ganeti import constants
+ from ganeti import errors
+ from ganeti import locking
+ from ganeti import hypervisor
++from ganeti.hypervisor import ovn_helper
+ from ganeti.masterd import iallocator
+ from ganeti import utils
+ from ganeti.cmdlib.base import LogicalUnit, Tasklet
+@@ -433,6 +434,16 @@ class TLMigrateInstance(Tasklet):
+     CheckInstanceBridgesExist(self.lu, self.instance,
+                               node_uuid=target_node_uuid)
+ 
++    # check OVN connectivity if instance has OVN NICs
++    if not self.cleanup and ovn_helper.HasOVNNics(self.instance):
++      nb_connection = self._GetOVNNbConnection()
++      try:
++        ovn_helper.VerifyOVNConnectivity(nb_connection)
++      except errors.HypervisorError as err:
++        raise errors.OpPrereqError(
++            "OVN northbound database is not accessible: %s" % err,
++            errors.ECODE_ENVIRON)
++
+     if not self.cleanup:
+       CheckNodeNotDrained(self.lu, target_node_uuid)
+       if not self.failover:
+@@ -635,6 +646,96 @@ class TLMigrateInstance(Tasklet):
+         self.cfg.GetNodeName(uuid) for uuid in node_uuids))
+     return node_uuids
+ 
++  def _GetOVNNbConnection(self):
++    """Get OVN NB connection string from hypervisor parameters.
++
++    @rtype: string or None
++    @return: OVN NB connection string
++
++    """
++    cluster = self.cfg.GetClusterInfo()
++    hvp = cluster.FillHV(self.instance)
++    return hvp.get(constants.HV_OVN_NB_CONNECTION)
++
++  def _SetupOVNMultiChassis(self):
++    """Enable multi-chassis port binding for OVN NICs during migration.
++
++    This configures OVN to clone traffic to both source and destination
++    chassis, enabling near-zero-downtime migration.
++
++    """
++    if not ovn_helper.HasOVNNics(self.instance):
++      return
++
++    self.feedback_fn("* configuring OVN multi-chassis port binding")
++
++    nb_connection = self._GetOVNNbConnection()
++    source_chassis = ovn_helper.GetChassisName(
++        self.cfg.GetNodeName(self.source_node_uuid))
++    dest_chassis = ovn_helper.GetChassisName(
++        self.cfg.GetNodeName(self.target_node_uuid))
++
++    for nic_idx, nic in enumerate(self.instance.nics):
++      if nic.nicparams.get(constants.NIC_MODE) == constants.NIC_MODE_OVN:
++        try:
++          ovn_helper.SetMultiChassisBinding(
++              nic, source_chassis, dest_chassis, nb_connection)
++        except errors.HypervisorError as err:
++          raise errors.OpExecError(
++              "Failed to set up OVN multi-chassis binding for NIC %d: %s" %
++              (nic_idx, err))
++
++  def _ClearOVNMultiChassis(self):
++    """Clear multi-chassis binding, keeping only destination chassis.
++
++    This should be called after migration completes successfully.
++
++    """
++    if not ovn_helper.HasOVNNics(self.instance):
++      return
++
++    self.feedback_fn("* clearing OVN multi-chassis port binding")
++
++    nb_connection = self._GetOVNNbConnection()
++    final_chassis = ovn_helper.GetChassisName(
++        self.cfg.GetNodeName(self.target_node_uuid))
++
++    for nic_idx, nic in enumerate(self.instance.nics):
++      if nic.nicparams.get(constants.NIC_MODE) == constants.NIC_MODE_OVN:
++        try:
++          ovn_helper.ClearMultiChassisBinding(
++              nic, final_chassis, nb_connection)
++        except errors.HypervisorError as err:
++          # Log but don't fail - migration already succeeded
++          logging.warning(
++              "Failed to clear OVN multi-chassis binding for NIC %d: %s",
++              nic_idx, err)
++
++  def _RevertOVNMultiChassis(self):
++    """Revert OVN ports to single-chassis binding on source node.
++
++    This should be called if migration fails, to restore ports to
++    their original state on the source chassis.
++
++    """
++    if not ovn_helper.HasOVNNics(self.instance):
++      return
++
++    self.feedback_fn("* reverting OVN port bindings to source chassis")
++
++    nb_connection = self._GetOVNNbConnection()
++    source_chassis = ovn_helper.GetChassisName(
++        self.cfg.GetNodeName(self.source_node_uuid))
++
++    for nic_idx, nic in enumerate(self.instance.nics):
++      if nic.nicparams.get(constants.NIC_MODE) == constants.NIC_MODE_OVN:
++        try:
++          ovn_helper.ClearMultiChassisBinding(
++              nic, source_chassis, nb_connection)
++        except errors.HypervisorError as err:
++          logging.warning(
++              "Failed to revert OVN binding for NIC %d: %s", nic_idx, err)
++
+   def _ExecCleanup(self):
+     """Try to cleanup after a failed migration.
+ 
+@@ -781,6 +882,9 @@ class TLMigrateInstance(Tasklet):
+ 
+     @return: tuple of rpc call results
+     """
++    # Revert OVN multi-chassis binding on failure
++    self._RevertOVNMultiChassis()
++
+     src_result = self.rpc.call_instance_finalize_migration_dst(
+         self.target_node_uuid, self.instance, self.migration_info, False)
+     abort_msg = src_result.fail_msg
+@@ -892,6 +996,9 @@ class TLMigrateInstance(Tasklet):
+     self._OpenInstanceDisks(self.source_node_uuid, False)
+     self._OpenInstanceDisks(self.target_node_uuid, False)
+ 
++    # Set up OVN multi-chassis binding before accepting instance on target
++    self._SetupOVNMultiChassis()
++
+     self.feedback_fn("* preparing %s to accept the instance" %
+                      self.cfg.GetNodeName(self.target_node_uuid))
+     result = self.rpc.call_accept_instance(self.target_node_uuid,
+@@ -992,6 +1099,9 @@ class TLMigrateInstance(Tasklet):
+     self.cfg.SetInstancePrimaryNode(self.instance.uuid, self.target_node_uuid)
+     self.instance = self.cfg.GetInstanceInfo(self.instance_uuid)
+ 
++    # Clear OVN multi-chassis binding now that migration is complete
++    self._ClearOVNMultiChassis()
++
+     self._CloseInstanceDisks(self.source_node_uuid)
+     disks = self.cfg.GetInstanceDisks(self.instance_uuid)
+     if utils.AnyDiskOfType(disks, constants.DTS_INT_MIRROR):
+diff --git a/lib/cmdlib/instance_operation.py b/lib/cmdlib/instance_operation.py
+index 9a14ad00d..cb333d47d 100644
+--- a/lib/cmdlib/instance_operation.py
++++ b/lib/cmdlib/instance_operation.py
+@@ -52,6 +52,7 @@ from ganeti.cmdlib.instance_storage import StartInstanceDisks, \
+ from ganeti.cmdlib.instance_utils import BuildInstanceHookEnvByObject, \
+   CheckInstanceBridgesExist, CheckNodeFreeMemory, UpdateMetadata
+ from ganeti.hypervisor import hv_base
++from ganeti.hypervisor import ovn_helper
+ 
+ 
+ def _IsInstanceUserDown(cluster, instance, instance_info):
+@@ -108,6 +109,40 @@ class LUInstanceStartup(LogicalUnit):
+         list(self.cfg.GetInstanceNodes(self.instance.uuid))
+     return (nl, nl)
+ 
++  def _GetOVNNbConnection(self):
++    """Get OVN NB connection string from hypervisor parameters.
++
++    @rtype: string or None
++    @return: OVN NB connection string
++
++    """
++    cluster = self.cfg.GetClusterInfo()
++    hvp = cluster.FillHV(self.instance)
++    return hvp.get(constants.HV_OVN_NB_CONNECTION)
++
++  def _SetOVNRequestedChassis(self):
++    """Set requested-chassis for OVN NICs to the primary node.
++
++    This ensures OVN ports are bound to the correct chassis when
++    the instance starts.
++
++    """
++    if not ovn_helper.HasOVNNics(self.instance):
++      return
++
++    nb_connection = self._GetOVNNbConnection()
++    primary_chassis = ovn_helper.GetChassisName(
++        self.cfg.GetNodeName(self.instance.primary_node))
++
++    for nic_idx, nic in enumerate(self.instance.nics):
++      if nic.nicparams.get(constants.NIC_MODE) == constants.NIC_MODE_OVN:
++        try:
++          ovn_helper.SetRequestedChassis(nic, primary_chassis, nb_connection)
++        except errors.HypervisorError as err:
++          # Log but don't fail the start operation
++          logging.warning(
++              "Failed to set requested-chassis for NIC %d: %s", nic_idx, err)
++
+   def CheckPrereq(self):
+     """Check prerequisites.
+ 
+@@ -193,6 +228,9 @@ class LUInstanceStartup(LogicalUnit):
+       StartInstanceDisks(self, self.instance, self.op.force)
+       self.instance = self.cfg.GetInstanceInfo(self.instance.uuid)
+ 
++      # Set OVN requested-chassis to primary node before starting instance
++      self._SetOVNRequestedChassis()
++
+       result = \
+         self.rpc.call_instance_start(self.instance.primary_node,
+                                      (self.instance, self.op.hvparams,
+diff --git a/lib/cmdlib/instance_set_params.py b/lib/cmdlib/instance_set_params.py
+index afa3c2e26..10c2d6277 100644
+--- a/lib/cmdlib/instance_set_params.py
++++ b/lib/cmdlib/instance_set_params.py
+@@ -38,6 +38,7 @@ from ganeti import constants
+ from ganeti import errors
+ from ganeti import ht
+ from ganeti import hypervisor
++from ganeti.hypervisor import ovn_helper
+ from ganeti import locking
+ from ganeti.masterd import iallocator
+ from ganeti import netutils
+@@ -1229,7 +1230,7 @@ class LUInstanceSetParams(LogicalUnit):
+       nics = [nic.Copy() for nic in self.instance.nics]
+       ApplyContainerMods("NIC", nics, self._nic_chgdesc, self.nicmod,
+                          self._CreateNewNic, None, self._ApplyNicMods,
+-                         self._RemoveNic, None)
++                         self._RemoveNic, None, post_add_fn=self._PostAddNic)
+       # Verify that NIC names are unique and valid
+       utils.ValidateDeviceNames("NIC", nics)
+       self._new_nics = nics
+@@ -1856,11 +1857,45 @@ class LUInstanceSetParams(LogicalUnit):
+     return changes
+ 
+   def _RemoveNic(self, idx, nic, _):
++    # Delete OVN port if NIC is OVN mode
++    if nic.nicparams.get(constants.NIC_MODE) == constants.NIC_MODE_OVN:
++      cluster = self.cfg.GetClusterInfo()
++      hvp = cluster.FillHV(self.instance)
++      nb_connection = hvp.get(constants.HV_OVN_NB_CONNECTION)
++
++      try:
++        logging.info("Deleting OVN port for instance %s NIC %d",
++                     self.instance.name, idx)
++        ovn_helper.DeleteOVNPort(nic, nb_connection)
++      except errors.HypervisorError as err:
++        logging.warning("Failed to delete OVN port for NIC %d: %s", idx, err)
++
+     if self.op.hotplug:
+       return self._HotplugDevice(constants.HOTPLUG_ACTION_REMOVE,
+                                  constants.HOTPLUG_TARGET_NIC,
+                                  nic, None, idx)
+ 
++  def _PostAddNic(self, idx, nic):
++    """Post-processing for newly added NIC.
++
++    Creates OVN port if NIC uses OVN mode.
++
++    @param idx: NIC index
++    @param nic: NIC object
++
++    """
++    if nic.nicparams.get(constants.NIC_MODE) == constants.NIC_MODE_OVN:
++      cluster = self.cfg.GetClusterInfo()
++      hvp = cluster.FillHV(self.instance)
++      nb_connection = hvparams.get(constants.HV_OVN_NB_CONNECTION)
++
++      try:
++        logging.info("Creating OVN port for instance %s NIC %d",
++                     self.instance.name, idx)
++        ovn_helper.CreateOVNPort(self.instance, idx, nic, nb_connection)
++      except errors.HypervisorError as err:
++        logging.warning("Failed to create OVN port for NIC %d: %s", idx, err)
++
+   def Exec(self, feedback_fn):
+     """Modifies an instance.
+ 
+diff --git a/lib/cmdlib/instance_utils.py b/lib/cmdlib/instance_utils.py
+index b9662f630..0aa182e59 100644
+--- a/lib/cmdlib/instance_utils.py
++++ b/lib/cmdlib/instance_utils.py
+@@ -36,6 +36,7 @@ import os
+ from ganeti import constants
+ from ganeti import errors
+ from ganeti import ht
++from ganeti.hypervisor import ovn_helper
+ from ganeti import locking
+ from ganeti.masterd import iallocator
+ from ganeti import netutils
+@@ -266,6 +267,25 @@ def RemoveInstance(lu, feedback_fn, instance, ignore_failures):
+   for disk in instance.disks:
+     lu.cfg.RemoveInstanceDisk(instance.uuid, disk)
+ 
++  # Delete OVN logical switch ports for OVN-mode NICs
++  cluster = lu.cfg.GetClusterInfo()
++  hvp = cluster.FillHV(instance)
++  nb_connection = hvp.get(constants.HV_OVN_NB_CONNECTION)
++
++  for nic_idx, nic in enumerate(instance.nics):
++    if nic.nicparams.get(constants.NIC_MODE) == constants.NIC_MODE_OVN:
++      try:
++        logging.info("Deleting OVN port for instance %s NIC %d",
++                     instance.name, nic_idx)
++        ovn_helper.DeleteOVNPort(nic, nb_connection)
++      except errors.HypervisorError as err:
++        # Log warning but continue - instance is being deleted anyway
++        logging.warning("Failed to delete OVN port for NIC %d: %s",
++                        nic_idx, err)
++        if not ignore_failures:
++          feedback_fn("Warning: Could not delete OVN port for NIC %d: %s" %
++                      (nic_idx, err))
++
+   logging.info("Removing instance %s out of cluster config", instance.name)
+   lu.cfg.RemoveInstance(instance.uuid)
+ 
+diff --git a/lib/cmdlib/network.py b/lib/cmdlib/network.py
+index 26fa06b38..56516805a 100644
+--- a/lib/cmdlib/network.py
++++ b/lib/cmdlib/network.py
+@@ -526,6 +526,8 @@ class LUNetworkConnect(LogicalUnit):
+     self.network_mode = self.op.network_mode
+     self.network_link = self.op.network_link
+     self.network_vlan = self.op.network_vlan
++    self.network_ovn_logical_switch = self.op.network_ovn_logical_switch
++    self.network_ovn_dhcpv4_options = self.op.network_ovn_dhcpv4_options
+ 
+     self.network_uuid = self.cfg.LookupNetwork(self.network_name)
+     self.group_uuid = self.cfg.LookupNodeGroup(self.group_name)
+@@ -557,6 +559,8 @@ class LUNetworkConnect(LogicalUnit):
+       "GROUP_NETWORK_MODE": self.network_mode,
+       "GROUP_NETWORK_LINK": self.network_link,
+       "GROUP_NETWORK_VLAN": self.network_vlan,
++      "GROUP_NETWORK_OVN_LOGICAL_SWITCH": self.network_ovn_logical_switch,
++      "GROUP_NETWORK_OVN_DHCPV4_OPTIONS": self.network_ovn_dhcpv4_options,
+       }
+     return ret
+ 
+@@ -578,6 +582,8 @@ class LUNetworkConnect(LogicalUnit):
+       constants.NIC_MODE: self.network_mode,
+       constants.NIC_LINK: self.network_link,
+       constants.NIC_VLAN: self.network_vlan,
++      constants.NIC_OVN_LOGICAL_SWITCH: self.network_ovn_logical_switch,
++      constants.NIC_OVN_DHCPV4_OPTIONS: self.network_ovn_dhcpv4_options,
+       }
+ 
+     objects.NIC.CheckParameterSyntax(self.netparams)
+@@ -648,6 +654,10 @@ class LUNetworkDisconnect(LogicalUnit):
+         "GROUP_NETWORK_MODE": self.netparams[constants.NIC_MODE],
+         "GROUP_NETWORK_LINK": self.netparams[constants.NIC_LINK],
+         "GROUP_NETWORK_VLAN": self.netparams[constants.NIC_VLAN],
++        "GROUP_NETWORK_OVN_LOGICAL_SWITCH":
++                self.netparams[constants.NIC_OVN_LOGICAL_SWITCH],
++        "GROUP_NETWORK_OVN_DHCPV4_OPTIONS":
++                self.netparams[constants.NIC_OVN_DHCPV4_OPTIONS],
+         })
+     return ret
+ 
+diff --git a/lib/config/__init__.py b/lib/config/__init__.py
+index e14605b1a..67583eda4 100644
+--- a/lib/config/__init__.py
++++ b/lib/config/__init__.py
+@@ -1011,6 +1011,8 @@ class ConfigWriter(object):
+           link = "route:%s" % nic_link
+         elif nic_mode == constants.NIC_MODE_OVS:
+           link = "ovs:%s" % nic_link
++        elif nic_mode == constants.NIC_MODE_OVN:
++          link = "ovn:%s" % nic_link
+         else:
+           raise errors.ProgrammerError("NIC mode '%s' not handled" % nic_mode)
+ 
+diff --git a/lib/hypervisor/hv_base.py b/lib/hypervisor/hv_base.py
+index f5a8ab017..3935b6a20 100644
+--- a/lib/hypervisor/hv_base.py
++++ b/lib/hypervisor/hv_base.py
+@@ -230,6 +230,7 @@ def ConfigureNIC(cmd, instance, seq, nic, tap, extra_env=None):
+   env = {
+     "PATH": "%s:/sbin:/usr/sbin" % os.environ["PATH"],
+     "INSTANCE": instance.name,
++    "INSTANCE_UUID": instance.uuid,
+     "MAC": nic.mac,
+     "MODE": nic.nicparams[constants.NIC_MODE],
+     "INTERFACE": tap,
+@@ -285,6 +286,7 @@ def DeConfigureNIC(cmd, instance, seq, nic, tap):
+   env = {
+     "PATH": "%s:/sbin:/usr/sbin" % os.environ["PATH"],
+     "INSTANCE": instance.name,
++    "INSTANCE_UUID": instance.uuid,
+     "MAC": nic.mac,
+     "MODE": nic.nicparams[constants.NIC_MODE],
+     "INTERFACE": tap,
+diff --git a/lib/hypervisor/hv_kvm/__init__.py b/lib/hypervisor/hv_kvm/__init__.py
+index ade3eb676..cceba29fa 100644
+--- a/lib/hypervisor/hv_kvm/__init__.py
++++ b/lib/hypervisor/hv_kvm/__init__.py
+@@ -457,6 +457,7 @@ class KVMHypervisor(hv_base.BaseHypervisor):
+        constants.QEMU_PCI_SLOTS,
+        None, None),
+     constants.HV_VNET_HDR: hv_base.NO_CHECK,
++    constants.HV_OVN_NB_CONNECTION: hv_base.NO_CHECK,
+     }
+ 
+   _VIRTIO = "virtio"
+@@ -2569,6 +2570,7 @@ class KVMHypervisor(hv_base.BaseHypervisor):
+     """
+     if success:
+       self._ConfigureRoutedExtNICs(instance, info)
++      self._ConfigureOVNNics(instance, info)
+       self._WriteKVMRuntime(instance.name, info)
+       self._ClearInstanceMigrationCapabilities(instance)
+     else:
+@@ -2703,6 +2705,37 @@ class KVMHypervisor(hv_base.BaseHypervisor):
+     """
+     self.qmp.SetBalloonMemory(mem)
+ 
++  @_with_qmp
++  def _AnnounceSelf(self, instance):
++    """Trigger RARP on interface after migration to announce self.
++
++    @type instance: L{objects.Instance} object
++    @param instance: instance in question
++
++    """
++    self.qmp.AnnounceSelf()
++
++  def _ConfigureOVNNics(self, instance, info):
++    """Configures all NICs in OVN mode.
++
++    @type instance: L{objects.Instance}
++    @param instance: the instance to be configured
++    @type info: string
++    @param info: serialized KVM runtime info
++
++    """
++    kvm_runtime = self._LoadKVMRuntime(instance, serialized_runtime=info)
++    kvm_nics = kvm_runtime[1]
++
++    has_ovn_nics = False
++    for nic in kvm_nics:
++      if nic.nicparams[constants.NIC_MODE] == constants.NIC_MODE_OVN:
++        has_ovn_nics = True
++        break
++
++    if has_ovn_nics:
++      self._AnnounceSelf(instance)
++
+   def GetNodeInfo(self, hvparams=None):
+     """Return information about the node.
+ 
+diff --git a/lib/hypervisor/hv_kvm/monitor.py b/lib/hypervisor/hv_kvm/monitor.py
+index 74360a8f0..f5af02f2e 100644
+--- a/lib/hypervisor/hv_kvm/monitor.py
++++ b/lib/hypervisor/hv_kvm/monitor.py
+@@ -841,6 +841,16 @@ class QmpConnection(QemuMonitorSocket):
+   def SetBalloonMemory(self, memory):
+     self.execute_qmp("balloon", {"value": memory * 1048576})
+ 
++  @_ensure_connection
++  def AnnounceSelf(self):
++    arguments = {
++      "initial": 50,
++      "max": 550,
++      "rounds": 10,
++      "step": 50
++    }
++    self.execute_qmp("announce-self", arguments)
++
+   @_ensure_connection
+   def Powerdown(self):
+     self.execute_qmp("system_powerdown")
+diff --git a/lib/hypervisor/ovn_helper.py b/lib/hypervisor/ovn_helper.py
+new file mode 100644
+index 000000000..785aa3bfd
+--- /dev/null
++++ b/lib/hypervisor/ovn_helper.py
+@@ -0,0 +1,334 @@
++#
++#
++
++# Copyright (C) 2025 Google Inc.
++# All rights reserved.
++#
++# Redistribution and use in source and binary forms, with or without
++# modification, are permitted provided that the following conditions are
++# met:
++#
++# 1. Redistributions of source code must retain the above copyright notice,
++# this list of conditions and the following disclaimer.
++#
++# 2. Redistributions in binary form must reproduce the above copyright
++# notice, this list of conditions and the following disclaimer in the
++# documentation and/or other materials provided with the distribution.
++#
++# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
++# IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
++# TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++# PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
++# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
++# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
++# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
++# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
++# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
++# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
++# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++
++
++"""OVN integration helper functions for Ganeti.
++
++This module provides functions for managing OVN logical switch ports
++during instance lifecycle and live migration.
++
++"""
++
++import logging
++
++from ganeti import utils
++from ganeti import errors
++from ganeti import constants
++
++
++def _RunOVNCommand(args, nb_connection=None, error_msg="OVN command failed"):
++  """Run an ovn-nbctl command.
++
++  @type args: list of strings
++  @param args: Command arguments for ovn-nbctl
++  @type nb_connection: string or None
++  @param nb_connection: OVN NB database connection string (optional)
++  @type error_msg: string
++  @param error_msg: Error message prefix
++  @rtype: string
++  @return: Command output
++  @raises HypervisorError: On command failure
++
++  """
++  cmd = ["ovn-nbctl"]
++
++  # Add database connection if specified
++  if nb_connection:
++    cmd.extend(["--db", nb_connection])
++
++  cmd.extend(args)
++
++  result = utils.RunCmd(cmd)
++
++  # WORKAROUND: Cannot rely on exit codes when running in job context
++  #
++  # Root cause: The luxid daemon sets SIGCHLD=SIG_IGN for automatic zombie
++  # process reaping. When SIGCHLD is explicitly ignored (not just default
++  # ignored), POSIX.1-2001 specifies that child processes are automatically
++  # reaped by the kernel, but the parent loses access to child exit status
++  # information. As a result, subprocess.wait() may return exit code 0
++  # even when the child process actually exited with a non-zero code.
++  #
++  # This affects ovn-nbctl when run from luxid job context:
++  # - In luxid jobs: SIGCHLD ignored → ovn-nbctl returns exit code 0 on error
++  # - In gnt-debug: SIGCHLD not ignored → ovn-nbctl returns correct exit code 1
++  #
++  # Solution: Check command output for error indicators like "no row" instead
++  # of relying solely on exit codes. This is the correct and necessary approach
++  # given POSIX signal handling semantics.
++  #
++  # See test_sigchld_exit_code.py for verification of this behavior.
++  if result.failed or "no row" in result.output:
++    raise errors.HypervisorError(
++        "%s: %s; output: %s" % (error_msg, result.fail_reason or "command output indicates error", result.output))
++
++  return result.output.strip()
++
++
++def GetOVNPortId(nic):
++  """Generate OVN logical switch port ID for instance NIC.
++
++  @type nic: L{objects.NIC}
++  @param nic: NIC object
++  @rtype: string
++  @return: Port ID string (NIC UUID)
++
++  """
++  return nic.uuid
++
++
++def CreateOVNPort(instance, nic_idx, nic, nb_connection=None):
++  """Create OVN logical switch port for instance NIC.
++
++  @type instance: L{objects.Instance}
++  @param instance: Instance object
++  @type nic_idx: int
++  @param nic_idx: NIC index (0-based)
++  @type nic: L{objects.NIC}
++  @param nic: NIC object
++  @type nb_connection: string or None
++  @param nb_connection: OVN NB database connection string (optional)
++
++  """
++  port_id = GetOVNPortId(nic)
++
++  lswitch = nic.nicparams.get(constants.NIC_OVN_LOGICAL_SWITCH)
++  if not lswitch:
++    raise errors.HypervisorError(
++        "NIC has no ovn_logical_switch parameter set (nicparams: %s)" % nic.nicparams)
++
++  # Check if port already exists
++  try:
++    _RunOVNCommand(["list", "logical_switch_port", port_id],
++                   nb_connection, "Check port existence")
++    # Port exists, reuse it
++    logging.info("OVN port %s already exists, reusing", port_id)
++    return
++  except errors.HypervisorError:
++    # Port doesn't exist (command failed), create it
++    pass
++
++  # Create logical switch port
++  _RunOVNCommand(
++      ["lsp-add", lswitch, port_id],
++      nb_connection,
++      "Failed to create OVN port %s" % port_id)
++
++  # Set addresses (MAC and optionally IP)
++  addresses = nic.mac
++  if nic.ip:
++    addresses = "%s %s" % (nic.mac, nic.ip)
++
++  _RunOVNCommand(
++      ["lsp-set-addresses", port_id, addresses],
++      nb_connection,
++      "Failed to set addresses for port %s" % port_id)
++
++  # Set port security (prevent MAC/IP spoofing)
++  _RunOVNCommand(
++      ["lsp-set-port-security", port_id, addresses],
++      nb_connection,
++      "Failed to set port security for port %s" % port_id)
++
++  # Set neutron:port_name external ID for compatibility
++  port_name = "%s_nic%d" % (instance.name, nic_idx)
++  _RunOVNCommand(
++      ["set", "logical_switch_port", port_id,
++       "external_ids:\"neutron:port_name\"=\"%s\"" % port_name],
++      nb_connection,
++      "Failed to set external ID for port %s" % port_id)
++
++  # Set neutron:network_name external ID to the logical switch name
++  _RunOVNCommand(
++      ["set", "logical_switch_port", port_id,
++       "external_ids:\"neutron:network_name\"=\"%s\"" % lswitch],
++      nb_connection,
++      "Failed to set neutron:network_name external ID for port %s" % port_id)
++
++  # Set DHCP options if ovn_dhcpv4_options is specified
++  dhcp_options = nic.nicparams.get(constants.NIC_OVN_DHCPV4_OPTIONS)
++  if dhcp_options:
++    _RunOVNCommand(
++        ["lsp-set-dhcpv4-options", port_id, dhcp_options],
++        nb_connection,
++        "Failed to set DHCPv4 options for port %s" % port_id)
++    logging.info("Set DHCPv4 options %s for port %s", dhcp_options, port_id)
++
++  logging.info("Created OVN port %s on logical switch %s", port_id, lswitch)
++
++
++def SetMultiChassisBinding(nic, source_chassis, dest_chassis,
++                           nb_connection=None):
++  """Enable multi-chassis port binding for migration.
++
++  This sets the OVN port's requested-chassis option to a comma-separated
++  list of source and destination chassis. OVN will then clone traffic
++  to both locations, enabling near-zero-downtime migration.
++
++  @type nic: L{objects.NIC}
++  @param nic: NIC object
++  @type source_chassis: string
++  @param source_chassis: Source chassis name
++  @type dest_chassis: string
++  @param dest_chassis: Destination chassis name
++  @type nb_connection: string or None
++  @param nb_connection: OVN NB database connection string (optional)
++
++  """
++  port_id = GetOVNPortId(nic)
++
++  # Set requested-chassis to "source,destination"
++  # The first chassis is primary, additional chassis also receive traffic
++  chassis_list = "%s,%s" % (source_chassis, dest_chassis)
++
++  _RunOVNCommand(
++      ["lsp-set-options", port_id, "activation-strategy=rarp", "requested-chassis=%s" % chassis_list],
++      nb_connection,
++      "Failed to set multi-chassis binding for port %s" % port_id)
++
++  logging.info("OVN: Set multi-chassis binding for %s: %s",
++               port_id, chassis_list)
++
++
++def ClearMultiChassisBinding(nic, final_chassis, nb_connection=None):
++  """Clear multi-chassis binding, keep only final chassis.
++
++  This should be called after migration completes to remove the
++  multi-chassis binding and bind the port to only the destination chassis.
++
++  @type nic: L{objects.NIC}
++  @param nic: NIC object
++  @type final_chassis: string
++  @param final_chassis: Final chassis name
++  @type nb_connection: string or None
++  @param nb_connection: OVN NB database connection string (optional)
++
++  """
++  port_id = GetOVNPortId(nic)
++
++  # Set requested-chassis to single chassis
++  _RunOVNCommand(
++      ["lsp-set-options", port_id, "requested-chassis=%s" % final_chassis],
++      nb_connection,
++      "Failed to clear multi-chassis binding for port %s" % port_id)
++
++  logging.info("OVN: Cleared multi-chassis binding for %s, now on %s",
++               port_id, final_chassis)
++
++
++def SetRequestedChassis(nic, chassis, nb_connection=None):
++  """Set requested-chassis option for OVN logical switch port.
++
++  This binds the port to a specific chassis, typically used when starting
++  an instance to ensure the port is bound to the node where the instance runs.
++
++  @type nic: L{objects.NIC}
++  @param nic: NIC object
++  @type chassis: string
++  @param chassis: Chassis name
++  @type nb_connection: string or None
++  @param nb_connection: OVN NB database connection string (optional)
++
++  """
++  port_id = GetOVNPortId(nic)
++
++  _RunOVNCommand(
++      ["lsp-set-options", port_id, "requested-chassis=%s" % chassis],
++      nb_connection,
++      "Failed to set requested-chassis for port %s" % port_id)
++
++  logging.info("OVN: Set requested-chassis=%s for port %s", chassis, port_id)
++
++
++def DeleteOVNPort(nic, nb_connection=None):
++  """Delete OVN logical switch port.
++
++  @type nic: L{objects.NIC}
++  @param nic: NIC object
++  @type nb_connection: string or None
++  @param nb_connection: OVN NB database connection string (optional)
++
++  """
++  port_id = GetOVNPortId(nic)
++
++  try:
++    _RunOVNCommand(
++        ["lsp-del", port_id],
++        nb_connection,
++        "Failed to delete OVN port %s" % port_id)
++    logging.info("Deleted OVN port %s", port_id)
++  except errors.HypervisorError as err:
++    # Port might not exist, log but don't fail
++    logging.warning("Could not delete OVN port %s: %s", port_id, err)
++
++
++def VerifyOVNConnectivity(nb_connection=None):
++  """Verify OVN northbound database is accessible.
++
++  @type nb_connection: string or None
++  @param nb_connection: OVN NB database connection string (optional)
++  @raises HypervisorError: If OVN NB is not accessible
++
++  """
++  try:
++    _RunOVNCommand(["show"], nb_connection, "OVN connectivity check failed")
++  except errors.HypervisorError as err:
++    raise errors.HypervisorError(
++        "Cannot connect to OVN northbound database: %s" % err)
++
++
++def HasOVNNics(instance):
++  """Check if instance has any OVN-mode NICs.
++
++  @type instance: L{objects.Instance}
++  @param instance: Instance object
++  @rtype: bool
++  @return: True if instance has at least one OVN NIC
++
++  """
++  return any(nic.nicparams.get(constants.NIC_MODE) == constants.NIC_MODE_OVN
++             for nic in instance.nics)
++
++
++def GetChassisName(node_name):
++  """Get OVN chassis name for a Ganeti node.
++
++  By convention, OVN chassis name typically matches the node hostname.
++  This function can be enhanced to query OVN SB for the actual mapping
++  if needed.
++
++  @type node_name: string
++  @param node_name: Ganeti node name
++  @rtype: string
++  @return: Chassis name
++
++  """
++  # In most setups, chassis name == hostname
++  # If your setup uses different naming, modify this function
++  return node_name.split('.')[0]
+diff --git a/lib/query.py b/lib/query.py
+index eaa5b1603..65f8aed91 100644
+--- a/lib/query.py
++++ b/lib/query.py
+@@ -2897,7 +2897,7 @@ def _BuildNetworkFields():
+     (_MakeField("group_cnt", "NodeGroups", QFT_NUMBER, "Number of nodegroups"),
+      NETQ_GROUP, 0, _GetLength(network_to_groups)),
+     (_MakeField("group_list", "GroupList", QFT_OTHER,
+-     "List of nodegroups (group name, NIC mode, NIC link)"),
++     "List of nodegroups (group name, NIC mode, NIC link, OVN logical switch, OVN DHCPv4 options)"),
+      NETQ_GROUP, 0, lambda ctx, network: network_to_groups(ctx)[network.uuid]),
+     ])
+ 
+diff --git a/src/Ganeti/Constants.hs b/src/Ganeti/Constants.hs
+index 89a6d40ca..c57abfaee 100644
+--- a/src/Ganeti/Constants.hs
++++ b/src/Ganeti/Constants.hs
+@@ -1746,6 +1746,9 @@ hvKvmUseChroot = "use_chroot"
+ hvKvmUserShutdown :: String
+ hvKvmUserShutdown = "user_shutdown"
+ 
++hvOvnNbConnection :: String
++hvOvnNbConnection = "ovn_nb_connection"
++
+ hvLxcStartupTimeout :: String
+ hvLxcStartupTimeout = "startup_timeout"
+ 
+@@ -1932,6 +1935,7 @@ hvsParameterTypes = Map.fromList
+   , (hvKvmSpiceZlibGlzImgCompr,         VTypeString)
+   , (hvKvmUseChroot,                    VTypeBool)
+   , (hvKvmUserShutdown,                 VTypeBool)
++  , (hvOvnNbConnection,                 VTypeMaybeString)
+   , (hvLxcDevices,                      VTypeString)
+   , (hvLxcDropCapabilities,             VTypeString)
+   , (hvLxcExtraCgroups,                 VTypeString)
+@@ -2523,11 +2527,19 @@ nicMode = "mode"
+ nicVlan :: String
+ nicVlan = "vlan"
+ 
++nicOvnLogicalSwitch :: String
++nicOvnLogicalSwitch = "ovn_logical_switch"
++
++nicOvnDhcpv4Options :: String
++nicOvnDhcpv4Options = "ovn_dhcpv4_options"
++
+ nicsParameterTypes :: Map String VType
+ nicsParameterTypes =
+   Map.fromList [(nicMode, vtypeString),
+                 (nicLink, vtypeString),
+-                (nicVlan, vtypeString)]
++                (nicVlan, vtypeString),
++                (nicOvnLogicalSwitch, vtypeMaybeString),
++                (nicOvnDhcpv4Options, vtypeMaybeString)]
+ 
+ nicsParameters :: FrozenSet String
+ nicsParameters = ConstantUtils.mkSet (Map.keys nicsParameterTypes)
+@@ -2541,6 +2553,9 @@ nicModeRouted = Types.nICModeToRaw NMRouted
+ nicModeOvs :: String
+ nicModeOvs = Types.nICModeToRaw NMOvs
+ 
++nicModeOvn :: String
++nicModeOvn = Types.nICModeToRaw NMOvn
++
+ nicIpPool :: String
+ nicIpPool = Types.nICModeToRaw NMPool
+ 
+@@ -2640,6 +2655,12 @@ inicNetwork = "network"
+ inicVlan :: String
+ inicVlan = "vlan"
+ 
++inicOvnLogicalSwitch :: String
++inicOvnLogicalSwitch = "ovn_logical_switch"
++
++inicOvnDhcpv4Options :: String
++inicOvnDhcpv4Options = "ovn_dhcpv4_options"
++
+ inicParamsTypes :: Map String VType
+ inicParamsTypes =
+   Map.fromList [(inicBridge, VTypeMaybeString),
+@@ -2649,7 +2670,9 @@ inicParamsTypes =
+                 (inicMode, VTypeString),
+                 (inicName, VTypeMaybeString),
+                 (inicNetwork, VTypeMaybeString),
+-                (inicVlan, VTypeMaybeString)]
++                (inicVlan, VTypeMaybeString),
++                (inicOvnLogicalSwitch, VTypeMaybeString),
++                (inicOvnDhcpv4Options, VTypeMaybeString)]
+ 
+ inicParams :: FrozenSet String
+ inicParams = ConstantUtils.mkSet (Map.keys inicParamsTypes)
+@@ -4179,7 +4202,8 @@ hvcDefaults =
+           , (hvKvmExtra,                        PyValueEx "")
+           , (hvKvmMachineVersion,               PyValueEx "")
+           , (hvKvmMigrationCaps,                PyValueEx "")
+-          , (hvVnetHdr,                         PyValueEx True)])
++          , (hvVnetHdr,                         PyValueEx True)
++          , (hvOvnNbConnection,                 PyValueEx "")])
+   , (Fake, Map.fromList [(hvMigrationMode, PyValueEx htMigrationLive)])
+   , (Chroot, Map.fromList [(hvInitScript, PyValueEx "/ganeti-chroot")])
+   , (Lxc, Map.fromList
+@@ -4348,6 +4372,8 @@ niccDefaults =
+   [ (nicMode, PyValueEx nicModeBridged)
+   , (nicLink, PyValueEx defaultBridge)
+   , (nicVlan, PyValueEx "")
++  , (nicOvnLogicalSwitch, PyValueEx "")
++  , (nicOvnDhcpv4Options, PyValueEx "")
+   ]
+ 
+ -- | All of the following values are quite arbitrary - there are no
+diff --git a/src/Ganeti/HTools/Backend/IAlloc.hs b/src/Ganeti/HTools/Backend/IAlloc.hs
+index 6ffa36245..361726b2c 100644
+--- a/src/Ganeti/HTools/Backend/IAlloc.hs
++++ b/src/Ganeti/HTools/Backend/IAlloc.hs
+@@ -86,6 +86,7 @@ parseNic n a = do
+                Just "bridged" -> Ok $ Just Nic.Bridged
+                Just "routed" -> Ok $ Just Nic.Routed
+                Just "openvswitch" -> Ok $ Just Nic.OpenVSwitch
++               Just "ovn" -> Ok $ Just Nic.OVN
+                Nothing -> Ok Nothing
+                _ -> Bad $ "invalid NIC mode in instance " ++ n
+   link    <- maybeFromObj a "link"
+diff --git a/src/Ganeti/HTools/Nic.hs b/src/Ganeti/HTools/Nic.hs
+index 16d20eb05..934dcc057 100644
+--- a/src/Ganeti/HTools/Nic.hs
++++ b/src/Ganeti/HTools/Nic.hs
+@@ -48,7 +48,7 @@ import qualified Ganeti.HTools.Types as T
+ 
+ -- * Type declarations
+ 
+-data Mode = Bridged | Routed | OpenVSwitch deriving (Show, Eq)
++data Mode = Bridged | Routed | OpenVSwitch | OVN deriving (Show, Eq)
+ 
+ -- | The NIC type.
+ --
+diff --git a/src/Ganeti/JSON.hs b/src/Ganeti/JSON.hs
+index aadf72475..81b06deeb 100644
+--- a/src/Ganeti/JSON.hs
++++ b/src/Ganeti/JSON.hs
+@@ -75,6 +75,7 @@ module Ganeti.JSON
+   , MaybeForJSON(..)
+   , TimeAsDoubleJSON(..)
+   , Tuple5(..)
++  , Tuple6(..)
+   , nestedAccessByKey
+   , nestedAccessByKeyDotted
+   , branchOnField
+@@ -509,6 +510,27 @@ instance (J.JSON a, J.JSON b, J.JSON c, J.JSON d, J.JSON e)
+       , J.showJSON e
+       ]
+ 
++newtype Tuple6 a b c d e f = Tuple6 { unTuple6 :: (a, b, c, d, e, f) }
++
++instance (J.JSON a, J.JSON b, J.JSON c, J.JSON d, J.JSON e, J.JSON f)
++         => J.JSON (Tuple6 a b c d e f) where
++  readJSON (J.JSArray [a,b,c,d,e,f]) =
++    Tuple6 <$> ((,,,,,) <$> J.readJSON a
++                        <*> J.readJSON b
++                        <*> J.readJSON c
++                        <*> J.readJSON d
++                        <*> J.readJSON e
++                        <*> J.readJSON f)
++  readJSON _ = fail "Unable to read Tuple6"
++  showJSON (Tuple6 (a, b, c, d, e, f)) =
++    J.JSArray
++      [ J.showJSON a
++      , J.showJSON b
++      , J.showJSON c
++      , J.showJSON d
++      , J.showJSON e
++      , J.showJSON f
++      ]
+ 
+ -- | Look up a value in a JSON object. Accessing @["a", "b", "c"]@ on an
+ -- object is equivalent as accessing @myobject.a.b.c@ on a JavaScript object.
+diff --git a/src/Ganeti/Objects/Nic.hs b/src/Ganeti/Objects/Nic.hs
+index 270151d6f..a4833601c 100644
+--- a/src/Ganeti/Objects/Nic.hs
++++ b/src/Ganeti/Objects/Nic.hs
+@@ -46,6 +46,8 @@ $(buildParam "Nic" "nicp"
+   [ simpleField "mode" [t| NICMode |]
+   , simpleField "link" [t| String  |]
+   , simpleField "vlan" [t| String |]
++  , simpleField "ovn_logical_switch" [t| String |]
++  , simpleField "ovn_dhcpv4_options" [t| String |]
+   ])
+ 
+ $(buildObject "PartialNic" "nic" $
+diff --git a/src/Ganeti/OpCodes.hs b/src/Ganeti/OpCodes.hs
+index ddc5dd654..0309434a8 100644
+--- a/src/Ganeti/OpCodes.hs
++++ b/src/Ganeti/OpCodes.hs
+@@ -974,6 +974,8 @@ $(genOpCode "OpCode"
+      , pNetworkMode
+      , pNetworkLink
+      , pNetworkVlan
++     , pNetworkOvnLogicalSwitch
++     , pNetworkOvnDhcpv4Options
+      , pIpConflictsCheck
+      ],
+      "network_name")
+diff --git a/src/Ganeti/OpParams.hs b/src/Ganeti/OpParams.hs
+index 139b14f01..5e7dd65f3 100644
+--- a/src/Ganeti/OpParams.hs
++++ b/src/Ganeti/OpParams.hs
+@@ -285,6 +285,8 @@ module Ganeti.OpParams
+   , pNetworkMode
+   , pNetworkLink
+   , pNetworkVlan
++  , pNetworkOvnLogicalSwitch
++  , pNetworkOvnDhcpv4Options
+   , pDryRun
+   , pDebugLevel
+   , pOpPriority
+@@ -395,6 +397,8 @@ $(buildObject "INicParams" "inic"
+   , optionalField $ simpleField C.inicVlan   [t| String         |]
+   , optionalField $ simpleField C.inicBridge [t| NonEmptyString |]
+   , optionalField $ simpleField C.inicNetwork [t| NonEmptyString |]
++  , optionalField $ simpleField C.inicOvnLogicalSwitch [t| NonEmptyString |]
++  , optionalField $ simpleField C.inicOvnDhcpv4Options [t| String |]
+   ])
+ 
+ deriving instance Ord INicParams
+@@ -1877,6 +1881,17 @@ pNetworkVlan =
+   withDoc "Network vlan when connecting to a group" .
+   defaultField [| "" |] $ stringField "network_vlan"
+ 
++pNetworkOvnLogicalSwitch :: Field
++pNetworkOvnLogicalSwitch =
++  withDoc "OVN logical switch when connecting to a group" .
++  optionalField $
++  simpleField "network_ovn_logical_switch" [t| NonEmptyString |]
++
++pNetworkOvnDhcpv4Options :: Field
++pNetworkOvnDhcpv4Options =
++  withDoc "OVN DHCPv4 options UUID when connecting to a group" .
++  defaultField [| "" |] $ stringField "network_ovn_dhcpv4_options"
++
+ pEnabledDataCollectors :: Field
+ pEnabledDataCollectors =
+   withDoc "Set the active data collectors" .
+diff --git a/src/Ganeti/Query/Instance.hs b/src/Ganeti/Query/Instance.hs
+index 8ea2c0f57..d6c0b5232 100644
+--- a/src/Ganeti/Query/Instance.hs
++++ b/src/Ganeti/Query/Instance.hs
+@@ -366,6 +366,18 @@ getNicVlan params
+   | nicpMode params == NMOvs = Just $ nicpVlan params
+   | otherwise                = Nothing
+ 
++-- | Gets the OVN logical switch of a NIC.
++getNicOvnLogicalSwitch :: FilledNicParams -> Maybe String
++getNicOvnLogicalSwitch params
++  | nicpMode params == NMOvn = Just $ nicpOvnLogicalSwitch params
++  | otherwise                = Nothing
++
++-- | Gets the OVN DHCPv4 options of a NIC.
++getNicOvnDhcpv4Options :: FilledNicParams -> Maybe String
++getNicOvnDhcpv4Options params
++  | nicpMode params == NMOvn = Just $ nicpOvnDhcpv4Options params
++  | otherwise                = Nothing
++
+ -- | Fill partial NIC params by using the defaults from the configuration.
+ fillNicParamsFromConfig :: ConfigData -> PartialNicParams -> FilledNicParams
+ fillNicParamsFromConfig cfg = fillParams (getDefaultNicParams cfg)
+diff --git a/src/Ganeti/Query/Network.hs b/src/Ganeti/Query/Network.hs
+index 3ef080327..240f67f27 100644
+--- a/src/Ganeti/Query/Network.hs
++++ b/src/Ganeti/Query/Network.hs
+@@ -47,7 +47,7 @@ import qualified Data.Map as Map
+ import Data.Maybe (fromMaybe, mapMaybe)
+ import Data.List (find, intercalate)
+ 
+-import Ganeti.JSON (fromContainer)
++import Ganeti.JSON (fromContainer, Tuple6(..))
+ import Ganeti.Network
+ import Ganeti.Objects
+ import qualified Ganeti.Objects.BitArray as BA
+@@ -82,7 +82,7 @@ networkFields =
+      FieldSimple (rsNormal . getReservedCount),
+      QffNormal)
+   , (FieldDefinition "group_list" "GroupList" QFTOther
+-       "List of nodegroups (group name, NIC mode, NIC link)",
++       "List of nodegroups (group name, NIC mode, NIC link, OVN switch, OVN DHCPv4 options)",
+      FieldConfig (\cfg -> rsNormal . getGroupConnections cfg . uuidOf),
+      QffNormal)
+   , (FieldDefinition "group_cnt" "NodeGroups" QFTNumber "Number of nodegroups",
+@@ -112,7 +112,7 @@ fieldsMap = fieldListToFieldMap networkFields
+ -- | Given a network's UUID, this function lists all connections from
+ -- the network to nodegroups including the respective mode and links.
+ getGroupConnections ::
+-  ConfigData -> String -> [(String, String, String, String)]
++  ConfigData -> String -> [Tuple6 String String String String String String]
+ getGroupConnections cfg network_uuid =
+   mapMaybe (getGroupConnection network_uuid)
+   ((Map.elems . fromContainer . configNodegroups) cfg)
+@@ -122,13 +122,13 @@ getGroupConnections cfg network_uuid =
+ -- network is connected to the group. Returns 'Nothing' if the network
+ -- is not connected to the group.
+ getGroupConnection ::
+-  String -> NodeGroup -> Maybe (String, String, String, String)
++  String -> NodeGroup -> Maybe (Tuple6 String String String String String String)
+ getGroupConnection network_uuid group =
+   let networks = fromContainer . groupNetworks $ group
+   in case Map.lookup (UTF8.fromString network_uuid) networks of
+     Nothing -> Nothing
+     Just net ->
+-      Just (groupName group, getNicMode net, getNicLink net, getNicVlan net)
++      Just (Tuple6 (groupName group, getNicMode net, getNicLink net, getNicVlan net, getNicOvnLogicalSwitch net, getNicOvnDhcpv4Options net))
+ 
+ -- | Retrieves the network's mode and formats it human-readable,
+ -- also in case it is not available.
+@@ -146,6 +146,16 @@ getNicLink nic_params = fromMaybe "-" (nicpLinkP nic_params)
+ getNicVlan :: PartialNicParams -> String
+ getNicVlan nic_params = fromMaybe "-" (nicpVlanP nic_params)
+ 
++-- | Retrieves the network's OVN logical switch and formats it human-readable,
++-- also in case it it not available.
++getNicOvnLogicalSwitch :: PartialNicParams -> String
++getNicOvnLogicalSwitch nic_params = fromMaybe "-" (nicpOvnLogicalSwitchP nic_params)
++
++-- | Retrieves the network's OVN DHCPv4 options and formats it human-readable,
++-- also in case it it not available.
++getNicOvnDhcpv4Options :: PartialNicParams -> String
++getNicOvnDhcpv4Options nic_params = fromMaybe "-" (nicpOvnDhcpv4OptionsP nic_params)
++
+ -- | Retrieves the network's instances' names.
+ getInstances :: ConfigData -> String -> [String]
+ getInstances cfg network_uuid =
+diff --git a/src/Ganeti/Types.hs b/src/Ganeti/Types.hs
+index 8c34f2002..6a270cd8b 100644
+--- a/src/Ganeti/Types.hs
++++ b/src/Ganeti/Types.hs
+@@ -671,6 +671,7 @@ $(THH.declareLADT ''String "NICMode"
+   [ ("NMBridged", "bridged")
+   , ("NMRouted",  "routed")
+   , ("NMOvs",     "openvswitch")
++  , ("NMOvn",     "ovn")
+   , ("NMPool",    "pool")
+   , ("NMExt",     "ext")
+   ])
+diff --git a/test/hs/Test/Ganeti/OpCodes.hs b/test/hs/Test/Ganeti/OpCodes.hs
+index baca56368..b98c978de 100644
+--- a/test/hs/Test/Ganeti/OpCodes.hs
++++ b/test/hs/Test/Ganeti/OpCodes.hs
+@@ -95,7 +95,8 @@ instance Arbitrary INicParams where
+   arbitrary = INicParams <$> genMaybe genNameNE <*> genMaybe genName <*>
+               genMaybe genNameNE <*> genMaybe genNameNE <*>
+               genMaybe genNameNE <*> genMaybe genName <*>
+-              genMaybe genNameNE <*> genMaybe genNameNE
++              genMaybe genNameNE <*> genMaybe genNameNE <*>
++              genMaybe genNameNE <*> genMaybe genName
+ 
+ instance Arbitrary IDiskParams where
+   arbitrary = IDiskParams <$> arbitrary <*> arbitrary <*>
+@@ -530,7 +531,8 @@ instance Arbitrary OpCodes.OpCode where
+           genMaybe (listOf genIPv4Address)
+       "OP_NETWORK_CONNECT" ->
+         OpCodes.OpNetworkConnect <$> genNameNE <*> genNameNE <*>
+-          arbitrary <*> genNameNE <*> genPrintableAsciiString <*> arbitrary
++          arbitrary <*> genNameNE <*> genPrintableAsciiString <*>
++          genMaybe genNameNE <*> genPrintableAsciiString <*> arbitrary
+       "OP_NETWORK_DISCONNECT" ->
+         OpCodes.OpNetworkDisconnect <$> genNameNE <*> genNameNE
+       "OP_RESTRICTED_COMMAND" ->
+diff --git a/test/py/legacy/cmdlib/instance_unittest.py b/test/py/legacy/cmdlib/instance_unittest.py
+index dd59035a7..db43038b9 100755
+--- a/test/py/legacy/cmdlib/instance_unittest.py
++++ b/test/py/legacy/cmdlib/instance_unittest.py
+@@ -776,6 +776,8 @@ nic0_mode=bridged
+ nic0_link=br_mock
+ nic0_mac=f6:ab:f4:45:d1:af
+ nic0_ip=192.0.2.1
++nic0_ovn_logical_switch=
++nic0_ovn_dhcpv4_options=
+ tags=tag1 tag2
+ hypervisor=xen-hvm
+ [hypervisor]
+diff --git a/tools/net-ovn-down.in b/tools/net-ovn-down.in
+new file mode 100644
+index 000000000..8fb5f7c81
+--- /dev/null
++++ b/tools/net-ovn-down.in
+@@ -0,0 +1,33 @@
++#!/bin/bash
++#
++
++# Copyright (C) 2026 the Ganeti project
++# All rights reserved.
++#
++# Redistribution and use in source and binary forms, with or without
++# modification, are permitted provided that the following conditions are
++# met:
++#
++# 1. Redistributions of source code must retain the above copyright notice,
++# this list of conditions and the following disclaimer.
++#
++# 2. Redistributions in binary form must reproduce the above copyright
++# notice, this list of conditions and the following disclaimer in the
++# documentation and/or other materials provided with the distribution.
++#
++# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
++# IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
++# TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++# PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
++# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
++# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
++# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
++# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
++# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
++# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
++# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++
++source @PKGLIBDIR@/net-common
++
++# add your own network logic here
++
+diff --git a/tools/net-ovn-up.in b/tools/net-ovn-up.in
+new file mode 100644
+index 000000000..215f44fa7
+--- /dev/null
++++ b/tools/net-ovn-up.in
+@@ -0,0 +1,52 @@
++#!/bin/bash
++#
++
++# Copyright (C) 2026 the Ganeti project
++# All rights reserved.
++#
++# Redistribution and use in source and binary forms, with or without
++# modification, are permitted provided that the following conditions are
++# met:
++#
++# 1. Redistributions of source code must retain the above copyright notice,
++# this list of conditions and the following disclaimer.
++#
++# 2. Redistributions in binary form must reproduce the above copyright
++# notice, this list of conditions and the following disclaimer in the
++# documentation and/or other materials provided with the distribution.
++#
++# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
++# IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
++# TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++# PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
++# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
++# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
++# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
++# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
++# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
++# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
++# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++
++source @PKGLIBDIR@/net-common
++
++# Use NIC UUID as the OVN port identifier
++# This must match the port ID generated by ovn_helper.py
++PORT_ID="${INTERFACE_UUID}"
++
++# For OVN mode, LINK contains the OVS integration bridge name
++OVS_BRIDGE="${LINK}"
++
++# Remove stale port
++ovs-vsctl del-port $INTERFACE || true
++# Bring interface up
++ip link set $INTERFACE up
++
++# Add port to OVS integration bridge and set all external-ids in a single transaction
++# This ensures the Interface row exists when we set the external-ids
++ovs-vsctl add-port ${OVS_BRIDGE} $INTERFACE -- \
++  set Interface $INTERFACE external-ids:iface-id="$PORT_ID" \
++    external-ids:instance-name="$INSTANCE" \
++    external-ids:instance-uuid="$INSTANCE_UUID" \
++    external-ids:nic-index="$INTERFACE_INDEX"
++
++log_info "OVN: Configured interface $INTERFACE with iface-id=$PORT_ID on bridge $OVS_BRIDGE"
