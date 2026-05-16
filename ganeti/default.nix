@@ -99,7 +99,7 @@ let
       hlint
     ]);
 
-  ganetiRev = "e67abf72d35d08e1cce2c0d9dfd6215cf2f73ddb";
+  ganetiRev = "a507122aa36f038fb8a31ae7f203dddf5929e2a0";
 in
 stdenv.mkDerivation
 rec {
@@ -108,7 +108,7 @@ rec {
   src = fetchgit {
     url = "https://github.com/ganeti/ganeti.git";
     rev = ganetiRev;
-    hash = "sha256-IotlbNhhWquHDbidPZ/Kf4Pgjqez8eAC8WpVl9ichHU=";
+    hash = "sha256-Lv/hMCmLe9DznfPJnZU7ZNaCEt4nic0eCsb+duiLOAs=";
   };
 
   nativeBuildInputs = [
@@ -175,7 +175,6 @@ rec {
     ./ganeti-3.1-ovn.patch
     ./ganeti-3.1-disable-ssh-sandbox-pytests.patch
     ./ganeti-3.1-pytest-unit-conftest.patch
-    ./ganeti-3.1-network-mode-openvswitch-rename.patch
   ];
 
   preConfigure = ''
