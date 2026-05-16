@@ -273,7 +273,6 @@ in
           man-pages-posix
           nettools # arp
           arping
-          dig
           vim
           swtpm # for TPM support
           vdo # for vdoformat

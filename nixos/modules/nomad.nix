@@ -245,7 +245,6 @@ in
 
     environment.systemPackages = [
       cfg.package
-      pkgs.cni-plugins
     ];
   };
 }

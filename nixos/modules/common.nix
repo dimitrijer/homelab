@@ -73,7 +73,7 @@
     [
       vim
       inetutils
-      dig
+      bind.dnsutils
       rsync
       tmux
       python3
