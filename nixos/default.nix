@@ -96,7 +96,16 @@ let
             echo "  Remote: $REMOTE_HASH"
           fi
 
-          ${pkgs.openssh}/bin/scp -i "$1" -r ${netbuild}/${targetDir} ${deployUser}@${deployHost}:${deployPath}
+          # Rotate the current remote class dir to ${className}.old as a
+          # one-deep rollback, then upload the new image. The `-` prefix tells
+          # sftp to keep going if a step fails.
+          printf '%s\n' \
+            "-rm ${deployPath}${className}.old/*" \
+            "-rmdir ${deployPath}${className}.old" \
+            "-rename ${deployPath}${className} ${deployPath}${className}.old" \
+            "-mkdir ${deployPath}${className}" \
+            "put ${netbuild}/${targetDir}/* ${deployPath}${className}/" \
+            | ${pkgs.openssh}/bin/sftp -b - -i "$1" ${deployUser}@${deployHost}
         '';
     };
 in
