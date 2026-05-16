@@ -6,23 +6,23 @@ index cb248beb7..e76c5e9be 100644
  pytoolsdir = $(pkgpythondir)/tools
  docdir = $(versiondir)$(datadir)/doc/$(PACKAGE)
  ifupdir = $(sysconfdir)/ganeti
--NET_MODES = bridged ovs routed
-+NET_MODES = bridged ovs ovn routed
+-NET_MODES = bridged openvswitch routed
++NET_MODES = bridged openvswitch ovn routed
  
  NET_SCRIPT_LIST = \
  	tools/net-bridged-down \
  	tools/net-bridged-up \
+ 	tools/net-openvswitch-down \
+ 	tools/net-openvswitch-up \
 +	tools/net-ovn-down \
 +	tools/net-ovn-up \
- 	tools/net-ovs-down \
- 	tools/net-ovs-up \
  	tools/net-routed-down \
 @@ -133,6 +135,7 @@ SYMLINK_TARGET_DIRS = \
  	$(sysconfdir)/ganeti \
  	$(libdir)/ganeti/iallocators \
  	$(libdir)/ganeti/network/bridged \
 +	$(libdir)/ganeti/network/ovn \
- 	$(libdir)/ganeti/network/ovs \
+ 	$(libdir)/ganeti/network/openvswitch \
  	$(libdir)/ganeti/network/routed \
  	$(libdir)/ganeti/tools \
 @@ -671,7 +674,8 @@ hypervisor_PYTHON = \

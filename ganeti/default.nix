@@ -104,7 +104,7 @@ in
 stdenv.mkDerivation
 rec {
   pname = "ganeti";
-  version = "unstable-2024-07-26";
+  version = "unstable-2026-05-16";
   src = fetchgit {
     url = "https://github.com/ganeti/ganeti.git";
     rev = ganetiRev;
@@ -171,10 +171,14 @@ rec {
     ./ganeti-3.1-bitarray-compat.patch
     ./ganeti-3.1-do-not-reset-env-when-updating-master-ip.patch
     ./ganeti-3.1-pandoc-3.6-man-rst.patch
-    ./ganeti-3.1-drbd-compat.patch
-    ./ganeti-3.1-ovn.patch
     ./ganeti-3.1-disable-ssh-sandbox-pytests.patch
     ./ganeti-3.1-pytest-unit-conftest.patch
+
+    # additional features
+    # - DRBD9 compatibility (WIP)
+    # - OVN network mode
+    ./ganeti-3.1-drbd-compat.patch
+    ./ganeti-3.1-ovn.patch
   ];
 
   preConfigure = ''
