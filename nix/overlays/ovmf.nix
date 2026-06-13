@@ -7,4 +7,14 @@ self: super: {
     msVarsTemplate = true;
     systemManagementModeRequired = false;
   };
+
+  # OVMF-xen uses OvmfXen.dsc which doesn't support Secure Boot
+  # and doesn't build EnrollDefaultKeys.efi, so pass an OVMF with
+  # those features disabled.
+  OVMF-xen = super.OVMF-xen.override {
+    OVMF = self.OVMF.override {
+      secureBoot = false;
+      msVarsTemplate = false;
+    };
+  };
 }
