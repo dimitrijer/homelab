@@ -2,12 +2,12 @@ diff --git a/lib/hypervisor/hv_kvm/monitor.py b/lib/hypervisor/hv_kvm/monitor.py
 index 5ceca3e69..aca2a60f7 100644
 --- a/lib/hypervisor/hv_kvm/monitor.py
 +++ b/lib/hypervisor/hv_kvm/monitor.py
-@@ -345,7 +345,7 @@ class QmpConnection(QemuMonitorSocket):
+@@ -349,7 +349,7 @@ class QmpConnection(QemuMonitorSocket):
    """Connection to the QEMU Monitor using the QEMU Monitor Protocol (QMP).
- 
+
    """
 -  _QMP_TIMEOUT = 5
 +  _QMP_TIMEOUT = 15
-   _FIRST_MESSAGE_KEY = "QMP"
-   _RETURN_KEY = "return"
-   _ACTUAL_KEY = ACTUAL_KEY = "actual"
+   # On q35 the guest's pciehp driver mediates detach; 30 s covers driver
+   # release and BAR deallocation on a loaded 1-vcpu guest.
+   _HOT_UNPLUG_EVENT_TIMEOUT = 30

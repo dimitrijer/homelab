@@ -99,7 +99,7 @@ let
       hlint
     ]);
 
-  ganetiRev = "a507122aa36f038fb8a31ae7f203dddf5929e2a0";
+  ganetiRev = "5e0590afb031946c40cb6659de0a3090ef4dd0f4";
 in
 stdenv.mkDerivation
 rec {
@@ -108,7 +108,7 @@ rec {
   src = fetchgit {
     url = "https://github.com/ganeti/ganeti.git";
     rev = ganetiRev;
-    hash = "sha256-Lv/hMCmLe9DznfPJnZU7ZNaCEt4nic0eCsb+duiLOAs=";
+    hash = "sha256-y2K4nO+DLMjIGqUBJYasDVu6IH2p4GnbsymdvEhZJ9Q=";
   };
 
   nativeBuildInputs = [
