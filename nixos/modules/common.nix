@@ -16,6 +16,7 @@
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOHY5AGvFXTnIT2XOxN41dwYFwumLN9+FJdgg03i8IQg dimitrije@endurance"
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIN7gdT/00QarOYM33vpSOu/KxCUoj8WuLkB+1QFAJ1+Y dimitrije@mackinaw"
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHKi8BBpDsh9SDfVhfuvlyF2dPYkxtiwWZzQ64ibkmcE dimitrije@skiff"
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEwpVa8ZWabj2oyZlqJJpx7o8kOkMxzqe/mi648u2dqL dimitrije@hyperion"
       ];
     };
   users.users.root.initialHashedPassword = "$6$OZ8xMsNhdISbKv8P$mj2ZqKDCBoxy59H/XphKKnQu3yxIHgwwI9hP3CJdIZHWzRh0boT9dfWArJjoIxAUsMpdxtybdKSr0X01Kclf81";
