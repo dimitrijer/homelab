@@ -41,6 +41,6 @@ let
     };
 in
 {
-  inherit ovn ovn-bgp-agent ganeti ganeti-os-providers nomad-driver-virt;
+  inherit ovn ovn-bgp-agent ganeti ganeti-os-providers nomad-driver-virt prometheus-ganeti-exporter;
   nginx = import ./nginx/default.nix { pkgs = pkgs.pkgsCross.aarch64-multiplatform; };
 } // netbuildClasses

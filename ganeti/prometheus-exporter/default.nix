@@ -1,25 +1,29 @@
-{ lib, stdenv, fetchFromGitHub, python3 }:
+{ lib, python3, fetchFromGitHub }:
 
-stdenv.mkDerivation {
+python3.pkgs.buildPythonApplication {
   pname = "prometheus-ganeti-exporter";
-  version = "1.0.0";
+  version = "1.1.0";
+  pyproject = true;
 
   src = fetchFromGitHub {
     owner = "ganeti";
     repo = "prometheus-ganeti-exporter";
-    rev = "22ecafc45814f6a89dc86d25f668b9f811c7814b";
-    hash = "sha256-JHnXYwYl7VLD/nKlQS9eGATXhLKBKNEAwjbJ404mipM=";
+    rev = "4dbcc386c835d17db619ff427107d4c304ed04dc";
+    hash = "sha256-6kfqom+sSh+SgljNHbBbJ0LLQXPWeYkTXImyYtys5D0=";
   };
 
-  propagatedBuildInputs = [
-    (python3.withPackages (ps: with ps; [
-      prometheus-client
-      requests
-      urllib3
-    ]))
+  build-system = with python3.pkgs; [ setuptools ];
+
+  dependencies = with python3.pkgs; [
+    prometheus-client
+    requests
+    urllib3
   ];
 
-  installPhase = "install -Dm755 ./prometheus-ganeti-exporter $out/bin/prometheus-ganeti-exporter";
+  nativeCheckInputs = with python3.pkgs; [
+    pytestCheckHook
+    pytest-mock
+  ];
 
   meta = with lib; {
     description = "Prometheus exporter for Ganeti metrics";
