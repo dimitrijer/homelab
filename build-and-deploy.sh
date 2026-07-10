@@ -25,6 +25,7 @@ ALL_IMAGES=(
     metrics
     navidrome
     paperless
+    uptime-kuma
 )
 
 if [[ $# -gt 0 ]]; then

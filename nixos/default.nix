@@ -142,4 +142,8 @@ in
     className = "adguard-home";
     modules = [ ./classes/adguard-home.nix ];
   };
+  uptime-kuma = mkNetbuild {
+    className = "uptime-kuma";
+    modules = [ ./classes/uptime-kuma.nix ];
+  };
 }

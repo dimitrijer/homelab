@@ -13,6 +13,8 @@ let
 
   adguard-home = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDJV47lkbAxKJI2xcgHdcRDpeAN34tIhpUxpXqDggvyNfdwwL4DPcS2YhIw3KJJwqU+5ZzjhVTqz00brjwV1HLbc+L2SXGoVF/VeqtnFd29/5yzSsAUtwTZz1VCPSS+ye8iyD4t9NCWfyvmkRgRM1NmaxeM+FN8r1Hmw9IvhEz37FSs8MPD8gJQQs9a4/BMMCwaztVNoXBsF+k3PNZUt7+T1oZrghXHmgcM2F8is5ibdGYfbkJltYbiDpNTCMqy0DXpYu0lIgJyAzWTT3XikT5yyYdAXhcmomxRzpYFahRleryHvQwSmj2VA0sONtgwVATR9wlUCV+/mouk91m7LHj99WKhsgyyYQEQLWfZtqRpEOfcUhZTJBqEVsKIwbNbdvf07yZFNnBhq1gXepgfYh6O3yGLKfxVocMswpGos6MGDH+tJE6Y2/PqlgZp3JmNjjOkmPFygZUG+oSLSRa0sLSzLybixPQ1LxKIMrWgDTqFJNQZ3ipKMytCFIg/80qd5yM= root@adguard-home";
 
+  uptime-kuma = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDENRx978MoVNtHbsf3DEXdJG3c9qgquHdYPeSEvQMd8VtYkRfN7oRh07Sr+1zFSjvZ4I2NMOaF+xOa/Vluu9Rqi3zNZDdW9Ov58+MO6GTx0IrYx/3NYWjtJ/vzewJFg95uts8YYIQynX8ZHidYZoTy7Da5W6+hHv6sD4qYpSYcQgPFsnOfb+ycaYM4Cs7fNdfOXRqqEFV+M1TafBTuoolAnySGaYMgnY6lxsObMh1LVJAgEfcWL8nolbq4bKcfiGO54AmFW57lCdC4AQrkhEW+uV0x4p3MppQALE76zn2j4c5X5xR4mr9+VmL0+KLNTQc5QSEuTjFOBWcBsQeqFudR946lSp8mWHaofccT/9uVi8S6hTIpFj+YWAgESZdNIhqX7Gus823e4+mQUmVksv930Q/MF7Pxbyw6mIaoTp5o+cAnPHXinvCW3cCnSpW6a42T4cK3xIfgjgOp8QgSzqFt7aiek8VTtvAiY2o7YzqB0zg7cHzSIoGAaNNpL3nrNPM= root@uptime-kuma";
+
   needAcme = [
     navidrome
     calibre-web
@@ -21,6 +23,7 @@ let
     audiobookshelf
     jellyfin
     adguard-home
+    uptime-kuma
   ];
 in
 {
