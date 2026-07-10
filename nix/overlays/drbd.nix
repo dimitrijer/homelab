@@ -1,13 +1,13 @@
 self: super: {
   linuxPackages = super.linuxPackages.extend
     (kfinal: kprev: {
-      drbd = let rev = "d3838e6f08d1e56882b8d7265fc9032c2ef8c9cb"; in kprev.drbd.overrideAttrs
+      drbd = let rev = "97da76040a6b31aaf9e12f1a167e77ca2b3cb43e"; in kprev.drbd.overrideAttrs
         (oldAttrs: rec {
-          version = "9.3.0";
+          version = "9.3.3";
           src = super.fetchgit {
             inherit rev;
             url = "https://github.com/LINBIT/drbd.git";
-            hash = "sha256-ijPqeVTBE3bvwKtrHN6NeNg7qx0xBLDqW9dulO/davo=";
+            hash = "sha256-COdio4Zh4SrPq5c0umg0shPlbfEZmO66rvrxaf3Hf5g=";
           };
           preConfigure = ''
             ${oldAttrs.preConfigure or "" } 
