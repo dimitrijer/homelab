@@ -511,6 +511,38 @@ To trigger full disk reprovisioning on next boot, add to kernel cmdline:
 homelab.provision_disks=true
 ```
 
+### First-Boot RAM Floor (tmpfs squashfs constraint)
+
+The `netboot-fetch-store` service downloads and mounts the squashfs store in
+the **stage-1 initrd**, which runs *before* `provision-disks` has formatted the
+disk. On a fresh VM the `/var` cache LV (`/dev/pool_state/var`) does not exist
+yet, so the fetch falls through to downloading the store into the **root
+tmpfs**. The root tmpfs defaults to **50% of RAM**, so the download fails with
+`ENOSPC` — and the boot drops to emergency mode — whenever:
+
+```
+store.squashfs size  >  RAM / 2
+```
+
+Practical rule: **give every VM at least ~2× the squashfs size in RAM for its
+first boot** (plus headroom for the running service). Check the store size with:
+
+```bash
+ls -lh $(nix-build -A <class>.netbuild --no-out-link)/by-class/<class>/store.squashfs
+```
+
+e.g. a 638 MB store needs a >1.3 GB tmpfs, so 1024 MB of RAM is not enough —
+bump the instance to 2 GB. This pressure only exists on the **first** boot:
+once disks are provisioned, subsequent boots mount the store from the on-disk
+`/var/cache/netboot` cache instead of tmpfs. Remember to also pass
+`homelab.provision_disks=true` on that first boot so the cache LV gets created.
+
+Set instance memory in Ganeti with:
+
+```bash
+gnt-instance modify -B minmem=2g,maxmem=2g <instance>
+```
+
 ## Secrets Management
 
 Secrets use [agenix](https://github.com/ryantm/agenix) with custom oneshot service variant:
@@ -652,6 +684,14 @@ nix-build --option substitute false
 - Check iPXE menu timeout (5000ms default)
 - Verify boot server reachability: `curl http://boot.homelab.tel`
 - Check MAC-based routing: `/usb1-part1/http/nixos/by-mac/{mac}/ipxe`
+
+**`netboot-fetch-store.service` fails / "Failed to start Fetch and mount netboot squashfs store"**:
+- Most common cause on a fresh VM: **not enough RAM**. The store downloads into
+  the root tmpfs (50% of RAM) on first boot, so `store.squashfs > RAM/2` fails
+  with `ENOSPC`. See "First-Boot RAM Floor" above — bump the instance to ≥2× the
+  store size.
+- Otherwise verify the store is actually deployed:
+  `curl -I http://boot.homelab.tel/nixos/by-class/{class}/store.squashfs`
 
 **Provisioning Issues**:
 - Verify kernel cmdline for `homelab.provision_disks=true`
