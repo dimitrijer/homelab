@@ -7,9 +7,21 @@ let
   nvmeDevice = "/dev/nvme0n1";
   vgGaneti = "pool_gnt";
   vgHost = "pool_host";
+  # `password` is the plaintext the exporter sends via HTTP Basic auth;
+  # `passwordHash` is the HA1 digest stored in the RAPI users file (written as
+  # {HA1}<passwordHash>). They must correspond:
+  #   printf '%s' 'prometheus-ganeti-exporter:Ganeti Remote API:<password>' | openssl md5
   prometheusExporterUser = {
     user = "prometheus-ganeti-exporter";
     password = "0274833ae7ceb9be03abae36726ed487";
+    passwordHash = "88e0f7738f841415b919ed9da1f40667";
+  };
+  # RAPI read-only user for Uptime Kuma health checks. Only the HA1 digest is
+  # stored here; the plaintext lives in the Uptime Kuma monitor config.
+  #   printf '%s' 'uptime-kuma:Ganeti Remote API:<plaintext>' | openssl md5
+  uptimeKumaUser = {
+    user = "uptime-kuma";
+    passwordHash = "9988a293056b2be9694636b1f3f8831c";
   };
 in
 {
@@ -70,7 +82,13 @@ in
         osProviders = [ pkgs.ganeti-os-pxe ];
         rapiUsers = [
           {
-            inherit (prometheusExporterUser) user password;
+            user = prometheusExporterUser.user;
+            password = prometheusExporterUser.passwordHash;
+            readonly = true;
+          }
+          {
+            user = uptimeKumaUser.user;
+            password = uptimeKumaUser.passwordHash;
             readonly = true;
           }
         ];
