@@ -17,10 +17,10 @@ self: super: {
         });
     });
   drbd =
-    let rev = "2701b04134d81b4e57c14ff2e93ddc355af16523";
+    let rev = "13c39bae4d340ed177e4abe5793b80478f6ad8cb";
     in super.drbd.overrideAttrs
       (oldAttrs: rec {
-        version = "9.33.0";
+        version = "9.34.0";
         preConfigure = ''
           ${oldAttrs.preConfigure or ""}
           ./autogen.sh
@@ -34,7 +34,7 @@ self: super: {
         src = super.fetchgit {
           url = "https://github.com/LINBIT/drbd-utils.git";
           inherit rev;
-          hash = "sha256-tSICzHtp2IgRNniBCI6OHP9No6lJhDHWvZSdoLL5jbg=";
+          hash = "sha256-g+HmOEVRO3CrmTqn7/bBUen2B92tAtTY0HY6AezkcYc=";
           fetchSubmodules = true;
         };
       });
