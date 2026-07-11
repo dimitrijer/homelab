@@ -175,7 +175,7 @@ rec {
     ./ganeti-3.1-pytest-unit-conftest.patch
 
     # additional features
-    # - DRBD9 compatibility (WIP)
+    # - DRBD9 compatibility (via the kernel's drbd8 compat mode)
     # - OVN network mode
     ./ganeti-3.1-drbd-compat.patch
     ./ganeti-3.1-ovn.patch

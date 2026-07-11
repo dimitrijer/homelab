@@ -178,7 +178,7 @@ in
           "net.ipv4.ip_forward" = 1;
         };
         extraModulePackages = with config.boot.kernelPackages; [
-          #drbd # DRBD 9.x
+          drbd # DRBD 9.x
         ];
       };
 

@@ -1,5 +1,26 @@
+diff --git a/Makefile.am b/Makefile.am
+index b4e3b6054..aef67f131 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -1829,6 +1829,8 @@ TEST_FILES = \
+ 	test/data/bdev-drbd-8.3.txt \
+ 	test/data/bdev-drbd-8.4.txt \
+ 	test/data/bdev-drbd-8.4-no-disk-params.txt \
++	test/data/bdev-drbd-9.3.txt \
++	test/data/bdev-drbd-9.3-no-disk.txt \
+ 	test/data/bdev-drbd-disk.txt \
+ 	test/data/bdev-drbd-net-ip4.txt \
+ 	test/data/bdev-drbd-net-ip6.txt \
+@@ -1922,6 +1924,7 @@ TEST_FILES = \
+ 	test/data/proc_drbd84.txt \
+ 	test/data/proc_drbd84_emptyfirst.txt \
+ 	test/data/proc_drbd84_sync.txt \
++	test/data/proc_drbd93.txt \
+ 	test/data/proc_meminfo.txt \
+ 	test/data/proc_cpuinfo.txt \
+ 	test/data/qa-minimal-nodes-instances-only.json \
 diff --git a/lib/storage/drbd.py b/lib/storage/drbd.py
-index 19d7e90d6..2495b4214 100644
+index b42077889..32b6b9e8c 100644
 --- a/lib/storage/drbd.py
 +++ b/lib/storage/drbd.py
 @@ -138,7 +138,9 @@ class DRBD8(object):
@@ -9,50 +30,90 @@ index 19d7e90d6..2495b4214 100644
 -    if version["k_minor"] <= 3:
 +    if version["k_major"] == 9:
 +      return drbd_cmdgen.DRBD9CmdGenerator(version)
-+    elif version["k_major"] == 8 and version["k_minor"] <= 3:
++    elif version["k_minor"] <= 3:
        return drbd_cmdgen.DRBD83CmdGenerator(version)
      else:
        return drbd_cmdgen.DRBD84CmdGenerator(version)
-@@ -213,15 +215,18 @@ class DRBD8Dev(base.BlockDev):
+@@ -216,12 +218,14 @@ class DRBD8Dev(base.BlockDev):
  
      info = DRBD8.GetProcInfo()
      version = info.GetVersion()
 -    if version["k_major"] != 8:
-+    if version["k_major"] != 8 and version["k_major"] != 9:
++    if version["k_major"] not in (8, 9):
        base.ThrowError("Mismatch in DRBD kernel version and requested ganeti"
 -                      " usage: kernel is %s.%s, ganeti wants 8.x",
 +                      " usage: kernel is %s.%s, ganeti wants 8.x or 9.x",
                        version["k_major"], version["k_minor"])
  
 -    if version["k_minor"] <= 3:
--      self._show_info_cls = drbd_info.DRBD83ShowInfo
 +    if version["k_major"] == 9:
 +      self._show_info_cls = drbd_info.DRBD9ShowInfo
++    elif version["k_minor"] <= 3:
+       self._show_info_cls = drbd_info.DRBD83ShowInfo
      else:
--      self._show_info_cls = drbd_info.DRBD84ShowInfo
-+      if version["k_major"] == 8 and version["k_minor"] <= 3:
-+        self._show_info_cls = drbd_info.DRBD83ShowInfo
-+      else:
-+        self._show_info_cls = drbd_info.DRBD84ShowInfo
+       self._show_info_cls = drbd_info.DRBD84ShowInfo
+@@ -318,12 +322,15 @@ class DRBD8Dev(base.BlockDev):
+     """
+     return self._show_info_cls.GetDevInfo(self._GetShowData(minor))
  
-     self._cmd_gen = DRBD8.GetCmdGenerator(info)
- 
-@@ -317,10 +322,12 @@ class DRBD8Dev(base.BlockDev):
- 
-   @staticmethod
-   def _NeedsLocalSyncerParams():
+-  @staticmethod
+-  def _NeedsLocalSyncerParams():
 -    # For DRBD >= 8.4, syncer init must be done after local, not in net.
-+    # For DRBD >= 8.4 and <9, syncer init must be done after local, not in net.
-     info = DRBD8.GetProcInfo()
-     version = info.GetVersion()
+-    info = DRBD8.GetProcInfo()
+-    version = info.GetVersion()
 -    return version["k_minor"] >= 4
-+    local_syncer_params = version["k_major"] == 8 and version["k_minor"] >= 4
-+    before_peer_setup = not local_syncer_params and version["k_major"] < 9
-+    return local_syncer_params, before_peer_setup
++  def _GetPeerNodeId(self, minor):
++    """Return the DRBD 9 node id of the peer, if a peer is configured.
++
++    @type minor: int
++    @param minor: the minor of the device whose peer to look up
++    @rtype: int or None
++
++    """
++    return self._GetShowInfo(minor).get("peer_node_id")
  
    def _MatchesLocal(self, info):
      """Test if our local config matches with an existing device.
-@@ -401,8 +408,8 @@ class DRBD8Dev(base.BlockDev):
+@@ -385,6 +392,30 @@ class DRBD8Dev(base.BlockDev):
+               info["remote_addr"] == (self._rhost, self._rport))
+     return retval
+ 
++  def _EnsureResource(self, minor):
++    """Create the DRBD resource and minor, if not created already.
++
++    This is a no-op for DRBD <= 8.4, whose local/net init commands create
++    the resource themselves and tolerate being re-run. DRBD 9 rejects a
++    repeated new-minor, so there the resource is created here, exactly
++    once, before the local or network assembly (whichever comes first).
++
++    @type minor: int
++    @param minor: the minor whose resource should exist
++
++    """
++    if self._cmd_gen.RESOURCE_INIT_INLINE:
++      return
++
++    if DRBD8.GetProcInfo().HasMinorStatus(minor):
++      return
++
++    for cmd in self._cmd_gen.GenResourceInitCmds(minor):
++      result = utils.RunCmd(cmd)
++      if result.failed:
++        base.ThrowError("drbd%d: can't create DRBD resource: cmd [%s]: %s",
++                        minor, cmd, result.output)
++
+   def _AssembleLocal(self, minor, backend, meta, size):
+     """Configure the local part of a DRBD device.
+ 
+@@ -398,14 +429,16 @@ class DRBD8Dev(base.BlockDev):
+     @param size: size in MiB
+ 
+     """
++    self._EnsureResource(minor)
++
+     cmds = self._cmd_gen.GenLocalInitCmds(minor, backend, meta,
+                                           size, self.params)
+ 
      for cmd in cmds:
        result = utils.RunCmd(cmd)
        if result.failed:
@@ -63,252 +124,524 @@ index 19d7e90d6..2495b4214 100644
  
      def _WaitForMinorSyncParams():
        """Call _SetMinorSyncParams and raise RetryAgain on errors.
-@@ -410,7 +417,8 @@ class DRBD8Dev(base.BlockDev):
+@@ -413,7 +446,7 @@ class DRBD8Dev(base.BlockDev):
        if self._SetMinorSyncParams(minor, self.params):
          raise utils.RetryAgain()
  
 -    if self._NeedsLocalSyncerParams():
-+    local_syncer_params, _ = self._NeedsLocalSyncerParams()
-+    if local_syncer_params:
++    if self._cmd_gen.SYNC_PARAMS_PHASE == drbd_cmdgen.SYNC_PARAMS_LOCAL:
        # Retry because disk config for DRBD resource may be still uninitialized.
        try:
          utils.Retry(_WaitForMinorSyncParams, 1.0, 5.0)
-@@ -453,8 +461,10 @@ class DRBD8Dev(base.BlockDev):
+@@ -455,14 +488,18 @@ class DRBD8Dev(base.BlockDev):
+     # synchronization speed over the wire. In some cases setting the
      # sync speed only after setting up both sides can race with DRBD
      # connecting, hence we set it here before telling DRBD anything
-     # about its peer.
--
+-    # about its peer.
++    # about its peer. This does not apply to DRBD 9, where the resync
++    # options are peer-device options and cannot be set before the peer
++    # is configured.
+ 
 -    if not self._NeedsLocalSyncerParams():
-+    # N.B. this workaround does not apply to DRBD 9+, because the peer
-+    # needs to be configured in order to apply peer device options.
-+    local_syncer_params, before_peer_setup = self._NeedsLocalSyncerParams()
-+    if not local_syncer_params and before_peer_setup:
++    if self._cmd_gen.SYNC_PARAMS_PHASE == drbd_cmdgen.SYNC_PARAMS_PRE_CONN:
        sync_errors = self._SetMinorSyncParams(minor, self.params)
        if sync_errors:
          base.ThrowError("drbd%d: can't set the synchronization parameters: %s" %
-@@ -487,7 +497,7 @@ class DRBD8Dev(base.BlockDev):
+                         (minor, utils.CommaJoin(sync_errors)))
+ 
++    self._EnsureResource(minor)
++
+     family = self._GetNetFamily(minor, lhost, rhost)
+ 
+     cmds = self._cmd_gen.GenNetInitCmds(minor, family, lhost, lport,
+@@ -490,7 +527,7 @@ class DRBD8Dev(base.BlockDev):
        base.ThrowError("drbd%d: timeout while configuring network", minor)
  
      # Once the assembly is over, try to set the synchronization parameters
 -    if not self._NeedsLocalSyncerParams():
-+    if not local_syncer_params:
++    if self._cmd_gen.SYNC_PARAMS_PHASE != drbd_cmdgen.SYNC_PARAMS_LOCAL:
        try:
          # The minor may not have been set yet, requiring us to set it at least
          # temporarily
+@@ -593,7 +630,18 @@ class DRBD8Dev(base.BlockDev):
+     @return: a list of error messages
+ 
+     """
+-    cmd = self._cmd_gen.GenSyncParamsCmd(minor, params)
++    try:
++      if self._cmd_gen.NEEDS_PEER_NODE_ID:
++        peer_node_id = self._GetPeerNodeId(minor)
++        if peer_node_id is None:
++          raise errors.BlockDeviceError("peer connection not configured")
++        cmd = self._cmd_gen.GenSyncParamsCmd(minor, params, peer_node_id)
++      else:
++        cmd = self._cmd_gen.GenSyncParamsCmd(minor, params)
++    except errors.BlockDeviceError as err:
++      msg = "drbd%d: can't set sync params: %s" % (minor, err)
++      logging.error(msg)
++      return [msg]
+     result = utils.RunCmd(cmd)
+     if result.failed:
+       msg = ("Can't change syncer rate: %s - %s" %
+@@ -630,10 +678,20 @@ class DRBD8Dev(base.BlockDev):
+ 
+     children_result = super(DRBD8Dev, self).PauseResumeSync(pause)
+ 
++    if self._cmd_gen.NEEDS_PEER_NODE_ID:
++      peer_node_id = self._GetPeerNodeId(self.minor)
++      if peer_node_id is None:
++        logging.error("drbd%d: can't %s sync: peer connection not configured",
++                      self.minor, "pause" if pause else "resume")
++        return False
++      sync_cmd_args = (self.minor, peer_node_id)
++    else:
++      sync_cmd_args = (self.minor,)
++
+     if pause:
+-      cmd = self._cmd_gen.GenPauseSyncCmd(self.minor)
++      cmd = self._cmd_gen.GenPauseSyncCmd(*sync_cmd_args)
+     else:
+-      cmd = self._cmd_gen.GenResumeSyncCmd(self.minor)
++      cmd = self._cmd_gen.GenResumeSyncCmd(*sync_cmd_args)
+ 
+     result = utils.RunCmd(cmd)
+     if result.failed:
+@@ -975,10 +1033,17 @@ class DRBD8Dev(base.BlockDev):
+     @param minor: the device to disconnect from the remote peer
+ 
+     """
+-    family = self._GetNetFamily(minor, self._lhost, self._rhost)
+-    cmd = self._cmd_gen.GenDisconnectCmd(minor, family,
+-                                         self._lhost, self._lport,
+-                                         self._rhost, self._rport)
++    if self._cmd_gen.NEEDS_PEER_NODE_ID:
++      peer_node_id = self._GetPeerNodeId(minor)
++      if peer_node_id is None:
++        # no peer connection configured: nothing to shut down
++        return
++      cmd = self._cmd_gen.GenDisconnectCmd(minor, peer_node_id)
++    else:
++      family = self._GetNetFamily(minor, self._lhost, self._rhost)
++      cmd = self._cmd_gen.GenDisconnectCmd(minor, family,
++                                           self._lhost, self._lport,
++                                           self._rhost, self._rport)
+     result = utils.RunCmd(cmd)
+     if result.failed:
+       base.ThrowError("drbd%d: can't shutdown network: %s",
 diff --git a/lib/storage/drbd_cmdgen.py b/lib/storage/drbd_cmdgen.py
-index 62e291e5c..ee6f50071 100644
+index 62e291e5c..51d25bcc6 100644
 --- a/lib/storage/drbd_cmdgen.py
 +++ b/lib/storage/drbd_cmdgen.py
-@@ -243,13 +243,15 @@ class DRBD83CmdGenerator(BaseDRBDCmdGenerator):
+@@ -30,13 +30,19 @@
  
-     # The following code assumes DRBD 8.x, with x < 4 and x != 1 (DRBD 8.1.x
-     # does not exist)
--    if not vmaj == 8 and vmin in (0, 2, 3):
-+    if not ((vmaj == 8 and vmin in (0, 2, 3)) or
-+            (vmaj == 9 and vmin == 2 and vrel == 15)):
-       raise errors.BlockDeviceError("Unsupported DRBD version: %d.%d.%d" %
-                                     (vmaj, vmin, vrel))
+ """DRBD command generating classes"""
  
-     def _AppendOrRaise(option, min_version):
-       """Helper for DRBD options"""
--      if min_version is not None and vrel >= min_version:
-+      if (vmaj == 8 and min_version is not None and vrel >= min_version) or \
-+          vmaj == 9:
-         args.append(option)
-       else:
-         raise errors.BlockDeviceError("Could not use the option %s as the"
-@@ -349,9 +351,11 @@ class DRBD84CmdGenerator(BaseDRBDCmdGenerator):
-                     dual_pri, hmac, secret, params):
-     cmds = []
+-import logging
+ import shlex
+ 
+ from ganeti import constants
+ from ganeti import errors
+ 
+ 
++# Phases in which the DRBD syncer parameters can be applied; which one
++# applies depends on the DRBD version (see the generator classes)
++SYNC_PARAMS_LOCAL = "local"          # after attaching the local disk
++SYNC_PARAMS_PRE_CONN = "pre-conn"    # before and after connecting to the peer
++SYNC_PARAMS_POST_CONN = "post-conn"  # only after connecting to the peer
++
++
+ class BaseDRBDCmdGenerator(object):
+   """Base class for DRBD command generators.
+ 
+@@ -44,9 +50,26 @@ class BaseDRBDCmdGenerator(object):
+   code.
+ 
+   """
++  # Whether Gen*SyncCmd/GenSyncParamsCmd need the id of the peer node (only
++  # DRBD 9+, where the resync options are peer-device options)
++  NEEDS_PEER_NODE_ID = False
++
++  # Whether the local/net init commands create the resource themselves
++  # (DRBD <= 8.4, where re-running the creation commands is harmless). If
++  # False, the resource must be created exactly once via
++  # GenResourceInitCmds before local or network initialization.
++  RESOURCE_INIT_INLINE = True
++
++  # When the syncer parameters can be applied (one of the SYNC_PARAMS_*
++  # phases above); must be set by subclasses
++  SYNC_PARAMS_PHASE = None
++
+   def __init__(self, version):
+     self._version = version
+ 
++  def GenResourceInitCmds(self, minor):
++    raise NotImplementedError
++
+   def GenShowCmd(self, minor):
+     raise NotImplementedError
+ 
+@@ -99,6 +122,11 @@ class DRBD83CmdGenerator(BaseDRBDCmdGenerator):
+   """Generates drbdsetup commands suited for the DRBD <= 8.3 syntax.
+ 
+   """
++  # For DRBD <= 8.3, setting the syncer parameters only after connecting
++  # can race with the connection handshake (which sends the sync speed
++  # over the wire), so they are also set before the peer setup.
++  SYNC_PARAMS_PHASE = SYNC_PARAMS_PRE_CONN
++
+   # command line options for barriers
+   _DISABLE_DISK_OPTION = "--no-disk-barrier"  # -a
+   _DISABLE_DRAIN_OPTION = "--no-disk-drain"   # -D
+@@ -166,17 +194,15 @@ class DRBD83CmdGenerator(BaseDRBDCmdGenerator):
+       # By definition we are using 8.x, so just check the rest of the version
+       # number
+       if vmin != 3 or vrel < 9:
+-        msg = ("The current DRBD version (8.%d.%d) does not support the "
+-               "dynamic resync speed controller" % (vmin, vrel))
+-        logging.error(msg)
+-        return [msg]
++        raise errors.BlockDeviceError(
++          "The current DRBD version (8.%d.%d) does not support the"
++          " dynamic resync speed controller" % (vmin, vrel))
+ 
+       if params[constants.LDP_PLAN_AHEAD] == 0:
+-        msg = ("A value of 0 for c-plan-ahead disables the dynamic sync speed"
+-               " controller at DRBD level. If you want to disable it, please"
+-               " set the dynamic-resync disk parameter to False.")
+-        logging.error(msg)
+-        return [msg]
++        raise errors.BlockDeviceError(
++          "A value of 0 for c-plan-ahead disables the dynamic sync speed"
++          " controller at DRBD level. If you want to disable it, please"
++          " set the dynamic-resync disk parameter to False.")
+ 
+       # add the c-* parameters to args
+       args.extend(["--c-plan-ahead", params[constants.LDP_PLAN_AHEAD],
+@@ -301,6 +327,10 @@ class DRBD84CmdGenerator(BaseDRBDCmdGenerator):
+   """Generates drbdsetup commands suited for the DRBD >= 8.4 syntax.
+ 
+   """
++  # For DRBD 8.4, syncer init must be done after the local disk attach,
++  # not while assembling the network.
++  SYNC_PARAMS_PHASE = SYNC_PARAMS_LOCAL
++
+   # command line options for barriers
+   _DISABLE_DISK_OPTION = "--disk-barrier=no"
+   _DISABLE_DRAIN_OPTION = "--disk-drain=no"
+@@ -317,12 +347,17 @@ class DRBD84CmdGenerator(BaseDRBDCmdGenerator):
+     return ["drbdmeta", "--force", self._DevPath(minor),
+             "v08", meta_dev, "flex-external", "create-md"]
+ 
++  def GenResourceInitCmds(self, minor):
++    return [["drbdsetup", "new-resource", self._GetResource(minor)],
++            ["drbdsetup", "new-minor", self._GetResource(minor),
++             str(minor), "0"]]
++
+   def GenLocalInitCmds(self, minor, data_dev, meta_dev, size_mb, params):
+-    cmds = []
++    if self.RESOURCE_INIT_INLINE:
++      cmds = self.GenResourceInitCmds(minor)
++    else:
++      cmds = []
  
 -    cmds.append(["drbdsetup", "new-resource", self._GetResource(minor)])
 -    cmds.append(["drbdsetup", "new-minor", self._GetResource(minor),
 -                 str(minor), "0"])
-+    vmaj = self._version["k_major"]
-+    if vmaj == 8:
-+      cmds.append(["drbdsetup", "new-resource", self._GetResource(minor)])
-+      cmds.append(["drbdsetup", "new-minor", self._GetResource(minor),
-+                   str(minor), "0"])
+     # We need to apply the activity log before attaching the disk else drbdsetup
+     # will fail.
+     cmds.append(["drbdmeta", self._DevPath(minor),
+@@ -347,11 +382,10 @@ class DRBD84CmdGenerator(BaseDRBDCmdGenerator):
+ 
+   def GenNetInitCmds(self, minor, family, lhost, lport, rhost, rport, protocol,
+                     dual_pri, hmac, secret, params):
+-    cmds = []
+-
+-    cmds.append(["drbdsetup", "new-resource", self._GetResource(minor)])
+-    cmds.append(["drbdsetup", "new-minor", self._GetResource(minor),
+-                 str(minor), "0"])
++    if self.RESOURCE_INIT_INLINE:
++      cmds = self.GenResourceInitCmds(minor)
++    else:
++      cmds = []
  
      args = ["drbdsetup", "connect", self._GetResource(minor),
              "%s:%s:%s" % (family, lhost, lport),
-@@ -465,3 +469,14 @@ class DRBD84CmdGenerator(BaseDRBDCmdGenerator):
+@@ -372,27 +406,35 @@ class DRBD84CmdGenerator(BaseDRBDCmdGenerator):
+     return cmds
+ 
+   def GenSyncParamsCmd(self, minor, params):
+-    args = ["drbdsetup", "disk-options", minor]
+-    if params[constants.LDP_DYNAMIC_RESYNC]:
+-      if params[constants.LDP_PLAN_AHEAD] == 0:
+-        msg = ("A value of 0 for c-plan-ahead disables the dynamic sync speed"
+-               " controller at DRBD level. If you want to disable it, please"
+-               " set the dynamic-resync disk parameter to False.")
+-        logging.error(msg)
+-        return [msg]
++    return ["drbdsetup", "disk-options", minor] + self._GenResyncOpts(params)
+ 
+-      # add the c-* parameters to args
+-      args.extend(["--c-plan-ahead", params[constants.LDP_PLAN_AHEAD],
+-                   "--c-fill-target", params[constants.LDP_FILL_TARGET],
+-                   "--c-delay-target", params[constants.LDP_DELAY_TARGET],
+-                   "--c-max-rate", params[constants.LDP_MAX_RATE],
+-                   "--c-min-rate", params[constants.LDP_MIN_RATE],
+-                   ])
++  @classmethod
++  def _GenResyncOpts(cls, params):
++    """Compute the drbdsetup options controlling the resync speed.
+ 
+-    else:
+-      args.extend(["--resync-rate", "%d" % params[constants.LDP_RESYNC_RATE]])
++    @type params: dict
++    @param params: LD level disk parameters related to the synchronization
++    @rtype: list
++    @return: drbdsetup option arguments
++    @raise errors.BlockDeviceError: when the parameter combination is invalid
+ 
+-    return args
++    """
++    if params[constants.LDP_DYNAMIC_RESYNC]:
++      if params[constants.LDP_PLAN_AHEAD] == 0:
++        raise errors.BlockDeviceError(
++          "A value of 0 for c-plan-ahead disables the dynamic sync speed"
++          " controller at DRBD level. If you want to disable it, please"
++          " set the dynamic-resync disk parameter to False.")
++
++      # the c-* parameters
++      return ["--c-plan-ahead", params[constants.LDP_PLAN_AHEAD],
++              "--c-fill-target", params[constants.LDP_FILL_TARGET],
++              "--c-delay-target", params[constants.LDP_DELAY_TARGET],
++              "--c-max-rate", params[constants.LDP_MAX_RATE],
++              "--c-min-rate", params[constants.LDP_MIN_RATE],
++              ]
++    else:
++      return ["--resync-rate", "%d" % params[constants.LDP_RESYNC_RATE]]
+ 
+   def GenPauseSyncCmd(self, minor):
+     return ["drbdsetup", "pause-sync", minor]
+@@ -465,3 +507,66 @@ class DRBD84CmdGenerator(BaseDRBDCmdGenerator):
        args.append(cls._DISABLE_DISK_OPTION)
  
      return args
 +
 +
 +class DRBD9CmdGenerator(DRBD84CmdGenerator):
-+  """Generates drbdsetup commands suited for the DRBD >= 8.4 syntax.
++  """Generates drbdsetup commands for DRBD 9.x kernels (drbd8 compat mode).
++
++  DRBD 9 nodes are driven through the same drbd8-style command sequence as
++  DRBD 8.4 nodes: drbd-utils translates most of it, and creating the
++  resource without a node id puts it into the kernel's drbd8 compat mode
++  (single peer, v08 metadata, 8.4-style /proc/drbd output). Only the
++  commands drbd-utils does not translate are overridden here:
++
++    - resources/minors must be created exactly once (DRBD 9 rejects a
++      repeated new-minor), hence RESOURCE_INIT_INLINE is False and the
++      caller runs GenResourceInitCmds separately
++    - primary/secondary take a resource name instead of a minor
++    - the resync options moved from disk-options to peer-device-options,
++      which also require the peer (node id) to be configured first
++    - show only supports the DRBD 9 output formats; we use --json
 +
 +  """
-+  def __init__(self, version):
-+    super(DRBD9CmdGenerator, self).__init__(version)
++  NEEDS_PEER_NODE_ID = True
++
++  RESOURCE_INIT_INLINE = False
++
++  # The resync options are peer-device options and can only be applied
++  # once the peer is configured, i.e. after connecting.
++  SYNC_PARAMS_PHASE = SYNC_PARAMS_POST_CONN
 +
 +  def GenShowCmd(self, minor):
 +    return ["drbdsetup", "show", self._GetResource(minor), "--json"]
++
++  # pylint: disable=W0221
++  def GenSyncParamsCmd(self, minor, params, peer_node_id):
++    return ["drbdsetup", "peer-device-options", self._GetResource(minor),
++            str(peer_node_id), "0"] + self._GenResyncOpts(params)
++
++  # pylint: disable=W0221
++  def GenDisconnectCmd(self, minor, peer_node_id):
++    # del-peer both disconnects and removes the connection object, so
++    # that a subsequent (drbd8-style) connect can recreate the peer and
++    # path from scratch. The peer addresses of the 8.4 signature are not
++    # needed: the peer node id fully identifies the connection.
++    return ["drbdsetup", "del-peer", self._GetResource(minor),
++            str(peer_node_id)]
++
++  def GenPauseSyncCmd(self, minor, peer_node_id):
++    return ["drbdsetup", "pause-sync", self._GetResource(minor),
++            str(peer_node_id), "0"]
++
++  def GenResumeSyncCmd(self, minor, peer_node_id):
++    return ["drbdsetup", "resume-sync", self._GetResource(minor),
++            str(peer_node_id), "0"]
++
++  def GenPrimaryCmd(self, minor, force):
++    cmd = ["drbdsetup", "primary", self._GetResource(minor)]
++
++    if force:
++      cmd.append("--force")
++
++    return cmd
++
++  def GenSecondaryCmd(self, minor):
++    return ["drbdsetup", "secondary", self._GetResource(minor)]
 diff --git a/lib/storage/drbd_info.py b/lib/storage/drbd_info.py
-index d033e5365..c6b710dec 100644
+index d033e5365..516eed9da 100644
 --- a/lib/storage/drbd_info.py
 +++ b/lib/storage/drbd_info.py
-@@ -32,6 +32,8 @@
+@@ -39,6 +39,7 @@ from ganeti import constants
+ from ganeti import utils
+ from ganeti import errors
+ from ganeti import compat
++from ganeti import serializer
+ from ganeti.storage import base
  
- import errno
- import re
-+import json
-+import logging
  
- import pyparsing as pyp
- 
-@@ -165,7 +167,7 @@ class DRBD8Info(object):
+@@ -165,7 +166,8 @@ class DRBD8Info(object):
  
    """
  
 -  _VERSION_RE = re.compile(r"^version: (\d+)\.(\d+)\.(\d+)(?:([.-])(\d+))?"
-+  _VERSION_RE = re.compile(r"^version: (\d+)\.(\d+)\.(\d+)(?:([.-])?((?:rc\.)?\d+))?"
++  _VERSION_RE = re.compile(r"^version: (\d+)\.(\d+)\.(\d+)"
++                           r"(?:([.-])((?:rc\.)?\d+))?"
                             r" \(api:(\d+)/proto:(\d+)(?:-(\d+))?\)")
    _VALID_LINE_RE = re.compile("^ *([0-9]+): cs:([^ ]+).*$")
  
-@@ -475,3 +477,60 @@ class DRBD84ShowInfo(BaseShowInfo):
+@@ -475,3 +477,64 @@ class DRBD84ShowInfo(BaseShowInfo):
            if lst[0] == "address":
              retval["remote_addr"] = tuple(lst[1:])
      return retval
 +
 +
-+class JsonParser(object):
-+  def parseString(self, show_data):
-+    try:
-+      logging.debug("Show data: {|%s|}", show_data)
-+      return json.loads(show_data)
-+    except json.JSONDecodeError as err:
-+      raise pyp.ParseException("Failed to decode JSON: '%s'" % str(err))
++class DRBD9ShowInfo(object):
++  """Parses the JSON output of `drbdsetup show <resource> --json`.
 +
++  Used for DRBD 9.x resources running in drbd8 compat mode. Unlike the
++  8.x classes this does not use pyparsing: the --json output is parsed
++  directly. Only the single-volume, single-peer layout created by Ganeti
++  (via the drbd8-style command sequence) is supported.
 +
-+class DRBD9ShowInfo(BaseShowInfo):
-+
-+  _address = BaseShowInfo._ipv4_addr ^ BaseShowInfo._ipv6_addr
-+
++  """
 +  @classmethod
 +  def _ParseAddress(cls, address):
-+    return address["address"], int(address["port"])
++    return (address["address"], int(address["port"]))
 +
 +  @classmethod
-+  def _ConstructShowParser(cls):
-+    return JsonParser()
++  def GetDevInfo(cls, show_data):
++    """Parse details about a given DRBD resource.
 +
-+  @classmethod
-+  def _TransformVolumeSection(cls, vol_content, retval):
-+    if "backing-disk" in vol_content and \
-+        isinstance(vol_content["backing-disk"], str):
-+      retval["local_dev"] = vol_content["backing-disk"]
-+    if "meta-disk" in vol_content and \
-+        isinstance(vol_content["meta-disk"], str):
-+      retval["meta_dev"] = vol_content["meta-disk"]
++    Returns a dict with the same keys as L{BaseShowInfo.GetDevInfo}
++    (except C{meta_index}, which flex-external metadata does not have),
++    plus C{peer_node_id} once a peer connection is configured.
 +
-+  @classmethod
-+  def _TransformParseResult(cls, parse_result):
++    """
 +    retval = {}
-+    if not isinstance(parse_result, list):
-+      raise pyp.ParseException("Unexpected json input")
 +
-+    if len(parse_result) == 1:
-+      resource = parse_result[0]
-+      if "_this_host" in resource:
-+        this_host = resource["_this_host"]
-+        if "volumes" in this_host and len(this_host["volumes"]) == 1:
-+          cls._TransformVolumeSection(this_host["volumes"][0], retval)
++    if not show_data:
++      return retval
 +
-+      if "connections" in resource \
-+          and len(resource["connections"]) == 1 \
-+          and "paths" in resource["connections"][0] \
-+          and len(resource["connections"][0]["paths"]) == 1:
-+        path = resource["connections"][0]["paths"][0]
++    try:
++      resources = serializer.LoadJson(show_data)
++    except ValueError as err:
++      base.ThrowError("Can't parse drbdsetup show output: %s", str(err))
++
++    if not isinstance(resources, list) or not resources:
++      return retval
++
++    resource = resources[0]
++
++    volumes = resource.get("_this_host", {}).get("volumes", [])
++    if len(volumes) == 1:
++      volume = volumes[0]
++      if isinstance(volume.get("backing-disk"), str):
++        retval["local_dev"] = volume["backing-disk"]
++      if isinstance(volume.get("meta-disk"), str):
++        retval["meta_dev"] = volume["meta-disk"]
++
++    connections = resource.get("connections", [])
++    if len(connections) == 1:
++      connection = connections[0]
++      if "_peer_node_id" in connection:
++        retval["peer_node_id"] = connection["_peer_node_id"]
++      paths = connection.get("paths", [])
++      if len(paths) == 1:
++        path = paths[0]
 +        if "this_host" in path:
 +          retval["local_addr"] = cls._ParseAddress(path["this_host"])
 +        if "remote_host" in path:
 +          retval["remote_addr"] = cls._ParseAddress(path["remote_host"])
-+    print("%s" % retval)
 +
 +    return retval
-diff --git a/test/data/bdev-drbd-9.2-no-disk.txt b/test/data/bdev-drbd-9.2-no-disk.txt
+diff --git a/test/data/bdev-drbd-9.3-no-disk.txt b/test/data/bdev-drbd-9.3-no-disk.txt
 new file mode 100644
-index 000000000..435045b40
+index 000000000..df8e91788
 --- /dev/null
-+++ b/test/data/bdev-drbd-9.2-no-disk.txt
-@@ -0,0 +1,17 @@
-+[
-+    {
-+        "resource": "resource1",
-+        "options": {
-+            "auto-promote": false
-+        },
-+        "_this_host": {
-+            "node-id": 0,
-+            "volumes": [
-+                {
-+                    "volume_nr": 0,
-+                    "device_minor": 1
-+                }
-+            ]
-+        }
-+    }
-+]
-diff --git a/test/data/bdev-drbd-9.2.txt b/test/data/bdev-drbd-9.2.txt
-new file mode 100644
-index 000000000..3080e6a7e
---- /dev/null
-+++ b/test/data/bdev-drbd-9.2.txt
-@@ -0,0 +1,41 @@
++++ b/test/data/bdev-drbd-9.3-no-disk.txt
+@@ -0,0 +1,53 @@
 +[
 +    {
 +        "resource": "resource0",
 +        "options": {
-+            "auto-promote": false
++            "auto-promote": false,
++            "drbd8-api-compatibility": false
 +        },
 +        "_this_host": {
-+            "node-id": 0,
++            "node-id": 1,
 +            "volumes": [
 +                {
 +                    "volume_nr": 0,
-+                    "device_minor": 0,
-+                    "backing-disk": "/dev/pool_gnt/3fa833ca-50b5-46d6-aad2-0b6a13eeaddb.disk0_data",
-+                    "meta-disk": "/dev/pool_gnt/3fa833ca-50b5-46d6-aad2-0b6a13eeaddb.disk0_meta",
-+                    "disk": {
-+                        "size": "20971520s"
-+                    }
++                    "device_minor": 0
 +                }
 +            ]
 +        },
 +        "connections": [
 +            {
-+                "path": {
-+                    "_this_host": "ipv4 10.1.100.4:11001",
-+                    "_remote_host": "ipv4 10.1.100.5:11001"
-+                },
++                "paths": [
++                    {
++                        "this_host": {
++                            "address": "192.0.2.1",
++                            "port": 11000,
++                            "family": "ipv4"
++                        },
++                        "remote_host": {
++                            "address": "192.0.2.2",
++                            "port": 11000,
++                            "family": "ipv4"
++                        }
++                    }
++                ],
++                "_cstate": "Connected",
 +                "net": {
-+                    "max-epoch-size": "8092",
-+                    "sndbuf-size": "10485760",
-+                    "rcvbuf-size": "10485760",
++                    "protocol": "C",
 +                    "cram-hmac-alg": "md5",
 +                    "after-sb-0pri": "discard-zero-changes",
 +                    "after-sb-1pri": "consensus",
-+                    "max-buffers": "8092",
-+                    "_name": "node1"
++                    "_name": "remote"
 +                },
-+                "_peer_node_id": 1
++                "volumes": [
++                    {
++                        "volume_nr": 0,
++                        "disk": {
++                            "resync-rate": "250k"
++                        }
++                    }
++                ],
++                "_peer_node_id": 0
 +            }
 +        ]
 +    }
 +]
 diff --git a/test/data/bdev-drbd-9.3.txt b/test/data/bdev-drbd-9.3.txt
 new file mode 100644
-index 000000000..e05b1e11f
+index 000000000..94917e688
 --- /dev/null
 +++ b/test/data/bdev-drbd-9.3.txt
-@@ -0,0 +1,128 @@
+@@ -0,0 +1,129 @@
 +[
 +    {
-+        "resource": "resource4",
++        "resource": "resource0",
 +        "options": {
 +            "cpu-mask": "",
 +            "on-no-data-accessible": "io-error",
@@ -330,11 +663,11 @@ index 000000000..e05b1e11f
 +            "volumes": [
 +                {
 +                    "volume_nr": 0,
-+                    "device_minor": 4,
-+                    "backing-disk": "/dev/pool_gnt/fd6e550e-7b0c-4d69-9c87-dcea40a7ee5e.disk0_data",
-+                    "meta-disk": "/dev/pool_gnt/fd6e550e-7b0c-4d69-9c87-dcea40a7ee5e.disk0_meta",
++                    "device_minor": 0,
++                    "backing-disk": "/dev/xenvg/test.data",
++                    "meta-disk": "/dev/xenvg/test.meta",
 +                    "disk": {
-+                        "size": "62914560s",
++                        "size": "41943040s",
 +                        "on-io-error": "detach",
 +                        "disk-barrier": false,
 +                        "disk-flushes": true,
@@ -351,7 +684,8 @@ index 000000000..e05b1e11f
 +                        "bitmap": true,
 +                        "max-bio-size": "1048576",
 +                        "diskless": "no",
-+                        "block-size": "512"
++                        "block-size": "512",
++                        "discard-granularity": "4294967295"
 +                    }
 +                }
 +            ]
@@ -361,18 +695,18 @@ index 000000000..e05b1e11f
 +                "paths": [
 +                    {
 +                        "this_host": {
-+                            "address": "10.1.97.2",
-+                            "port": 11029,
++                            "address": "192.0.2.1",
++                            "port": 11000,
 +                            "family": "ipv4"
 +                        },
 +                        "remote_host": {
-+                            "address": "10.1.97.4",
-+                            "port": 11029,
++                            "address": "192.0.2.2",
++                            "port": 11000,
 +                            "family": "ipv4"
 +                        }
 +                    }
 +                ],
-+                "_cstate": "Connecting",
++                "_cstate": "Connected",
 +                "net": {
 +                    "transport": "",
 +                    "load-balance-paths": false,
@@ -386,7 +720,6 @@ index 000000000..e05b1e11f
 +                    "ko-count": "7",
 +                    "allow-two-primaries": false,
 +                    "cram-hmac-alg": "md5",
-+                    "shared-secret": "06d45e9f54455a276aa2e01472ba11bb53a04486",
 +                    "after-sb-0pri": "discard-zero-changes",
 +                    "after-sb-1pri": "consensus",
 +                    "after-sb-2pri": "disconnect",
@@ -407,9 +740,9 @@ index 000000000..e05b1e11f
 +                    "max-buffers": "20000",
 +                    "allow-remote-read": true,
 +                    "tls": false,
-+                    "tls-keyring": "(null)",
-+                    "tls-privkey": "(null)",
-+                    "tls-certificate": "(null)",
++                    "tls-keyring": "",
++                    "tls-privkey": "",
++                    "tls-certificate": "",
 +                    "rdma-ctrl-rcvbuf-size": "0",
 +                    "rdma-ctrl-sndbuf-size": "0",
 +                    "_name": "remote"
@@ -425,7 +758,8 @@ index 000000000..e05b1e11f
 +                            "c-max-rate": "102400k",
 +                            "c-min-rate": "250k",
 +                            "bitmap": true,
-+                            "resync-without-replication": true
++                            "resync-without-replication": true,
++                            "peer-tiebreaker": true
 +                        }
 +                    }
 +                ],
@@ -434,8 +768,19 @@ index 000000000..e05b1e11f
 +        ]
 +    }
 +]
+diff --git a/test/data/proc_drbd93.txt b/test/data/proc_drbd93.txt
+new file mode 100644
+index 000000000..7fe5d5c25
+--- /dev/null
++++ b/test/data/proc_drbd93.txt
+@@ -0,0 +1,5 @@
++version: 9.3.3 (api:2/proto:118-124) (compat 8.4)
++GIT-hash: 97da76040a6b31aaf9e12f1a167e77ca2b3cb43e build by @localhost, 2026-07-10 12:10:56
++
++ 1: cs:Connected ro:Secondary/Secondary ds:UpToDate/UpToDate C r-----
++    ns:0 nr:0 dw:0 dr:0 al:0 bm:0 lo:1 pe:0 ua:0 ap:0 ep:1 wo:f oos:0
 diff --git a/test/py/legacy/ganeti.storage.drbd_unittest.py b/test/py/legacy/ganeti.storage.drbd_unittest.py
-index da2827042..8cffabc9e 100755
+index da2827042..dc04d782c 100755
 --- a/test/py/legacy/ganeti.storage.drbd_unittest.py
 +++ b/test/py/legacy/ganeti.storage.drbd_unittest.py
 @@ -51,6 +51,7 @@ class TestDRBD8(testutils.GanetiTestCase):
@@ -463,22 +808,243 @@ index da2827042..8cffabc9e 100755
        }
      ]
      for d, r in zip(data, result):
-@@ -190,6 +201,18 @@ class TestDRBD8Runner(testutils.GanetiTestCase):
+@@ -102,6 +113,19 @@ class TestDRBD8(testutils.GanetiTestCase):
+       self.assertEqual(info.GetVersion(), r)
+       self.assertEqual(info.GetVersionString(), d.replace("version: ", ""))
+ 
++  def testGetVersionCompatBanner(self):
++    """Test parsing the version line of a DRBD 9 kernel with 8.4 compat"""
++    info = drbd.DRBD8Info.CreateFromLines(
++      ["version: 9.3.3 (api:2/proto:118-124) (compat 8.4)"])
++    self.assertEqual(info.GetVersion(), {
++      "k_major": 9,
++      "k_minor": 3,
++      "k_point": 3,
++      "api": 2,
++      "proto": 118,
++      "proto2": "124",
++    })
++
+ 
+ class TestDRBD8Runner(testutils.GanetiTestCase):
+   """Testing case for drbd.DRBD8Dev"""
+@@ -190,6 +214,42 @@ class TestDRBD8Runner(testutils.GanetiTestCase):
                                    ("192.0.2.2", 11000)),
                      "Wrong network info (8.4.x)")
  
 +  def testParser93(self):
-+    """Test drbdsetup show parser for disk and network version 9.3"""
++    """Test drbdsetup show --json parser for disk and network version 9.3"""
 +    data = testutils.ReadTestData("bdev-drbd-9.3.txt")
 +    result = drbd_info.DRBD9ShowInfo.GetDevInfo(data)
-+    self.assertTrue(self._has_disk(result, "/dev/pool_gnt/fd6e550e-7b0c-4d69-9c87-dcea40a7ee5e.disk0_data",
-+                                   "/dev/pool_gnt/fd6e550e-7b0c-4d69-9c87-dcea40a7ee5e.disk0_meta",
-+                                   meta_index=None),
++    self.assertTrue(self._has_disk(result, "/dev/xenvg/test.data",
++                                   "/dev/xenvg/test.meta", meta_index=None),
 +                    "Wrong local disk info (9.3.x)")
-+    self.assertTrue(self._has_net(result, ("10.1.97.2", 11029),
-+                                  ("10.1.97.4", 11029)),
++    self.assertTrue(self._has_net(result, ("192.0.2.1", 11000),
++                                  ("192.0.2.2", 11000)),
 +                    "Wrong network info (9.3.x)")
++    self.assertEqual(result.get("peer_node_id"), 0)
++
++  def testParser93NoDisk(self):
++    """Test drbdsetup show --json parser for a diskless 9.3 device"""
++    data = testutils.ReadTestData("bdev-drbd-9.3-no-disk.txt")
++    result = drbd_info.DRBD9ShowInfo.GetDevInfo(data)
++    self.assertTrue(("local_dev" not in result and
++                     "meta_dev" not in result and
++                     "meta_index" not in result),
++                    "Should not find local disk info")
++    self.assertTrue(self._has_net(result, ("192.0.2.1", 11000),
++                                  ("192.0.2.2", 11000)),
++                    "Wrong network info (9.3.x)")
++    self.assertEqual(result.get("peer_node_id"), 0)
++
++  def testParser9Empty(self):
++    """Test drbdsetup show --json parser for empty input"""
++    self.assertEqual(drbd_info.DRBD9ShowInfo.GetDevInfo(None), {})
++    self.assertEqual(drbd_info.DRBD9ShowInfo.GetDevInfo(""), {})
++    self.assertEqual(drbd_info.DRBD9ShowInfo.GetDevInfo("[\n]\n"), {})
++
++  def testParser9Garbage(self):
++    """Test drbdsetup show --json parser for unparseable input"""
++    self.assertRaises(errors.BlockDeviceError,
++                      drbd_info.DRBD9ShowInfo.GetDevInfo, "resource {")
 +
    def testParserNetIP4(self):
      """Test drbdsetup show parser for IPv4 network"""
      data = testutils.ReadTestData("bdev-drbd-net-ip4.txt")
+@@ -449,6 +509,9 @@ class TestDRBD8Construction(testutils.GanetiTestCase):
+     self.proc84_info = \
+       drbd_info.DRBD8Info.CreateFromFile(
+         filename=testutils.TestDataFilename("proc_drbd84.txt"))
++    self.proc93_info = \
++      drbd_info.DRBD8Info.CreateFromFile(
++        filename=testutils.TestDataFilename("proc_drbd93.txt"))
+ 
+     self.test_unique_id = ("hosta.com", 123, "host2.com", 123, 0,
+                            serializer.Private("secret"))
+@@ -474,6 +537,8 @@ class TestDRBD8Construction(testutils.GanetiTestCase):
+     inst = drbd.DRBD8Dev(self.test_unique_id, [], 123, {}, self.test_dyn_params)
+     self.assertEqual(inst._show_info_cls, drbd_info.DRBD83ShowInfo)
+     self.assertTrue(isinstance(inst._cmd_gen, drbd_cmdgen.DRBD83CmdGenerator))
++    self.assertEqual(inst._cmd_gen.SYNC_PARAMS_PHASE,
++                     drbd_cmdgen.SYNC_PARAMS_PRE_CONN)
+ 
+   @testutils.patch_object(drbd.DRBD8, "GetProcInfo")
+   def testConstructionWith84Data(self, mock_create_from_file):
+@@ -482,6 +547,157 @@ class TestDRBD8Construction(testutils.GanetiTestCase):
+     inst = drbd.DRBD8Dev(self.test_unique_id, [], 123, {}, self.test_dyn_params)
+     self.assertEqual(inst._show_info_cls, drbd_info.DRBD84ShowInfo)
+     self.assertTrue(isinstance(inst._cmd_gen, drbd_cmdgen.DRBD84CmdGenerator))
++    self.assertEqual(inst._cmd_gen.SYNC_PARAMS_PHASE,
++                     drbd_cmdgen.SYNC_PARAMS_LOCAL)
++
++  @testutils.patch_object(drbd.DRBD8, "GetProcInfo")
++  def testConstructionWith93Data(self, mock_create_from_file):
++    mock_create_from_file.return_value = self.proc93_info
++
++    inst = drbd.DRBD8Dev(self.test_unique_id, [], 123, {}, self.test_dyn_params)
++    self.assertEqual(inst._show_info_cls, drbd_info.DRBD9ShowInfo)
++    self.assertTrue(isinstance(inst._cmd_gen, drbd_cmdgen.DRBD9CmdGenerator))
++    self.assertEqual(inst._cmd_gen.SYNC_PARAMS_PHASE,
++                     drbd_cmdgen.SYNC_PARAMS_POST_CONN)
++
++
++class TestDRBD84CmdGenerator(testutils.GanetiTestCase):
++  """Tests 8.4 command generation that the DRBD 9 support relies on"""
++
++  def setUp(self):
++    testutils.GanetiTestCase.setUp(self)
++    version = {
++      "k_major": 8,
++      "k_minor": 4,
++      "k_point": 11,
++      "api": 1,
++      "proto": 86,
++      "proto2": "101",
++    }
++    self.cmd_gen = drbd_cmdgen.DRBD84CmdGenerator(version)
++    self.params = {
++      constants.LDP_BARRIERS: "n",
++      constants.LDP_NO_META_FLUSH: False,
++      constants.LDP_DISK_CUSTOM: "",
++      constants.LDP_NET_CUSTOM: "",
++      constants.LDP_DYNAMIC_RESYNC: False,
++      constants.LDP_RESYNC_RATE: 1024,
++      constants.LDP_PROTOCOL: "C",
++    }
++
++  def testInitCmdsCreateResource(self):
++    """8.4 local/net init commands must create the resource inline"""
++    local_cmds = self.cmd_gen.GenLocalInitCmds(0, "/dev/xenvg/test.data",
++                                               "/dev/xenvg/test.meta",
++                                               1024, self.params)
++    net_cmds = self.cmd_gen.GenNetInitCmds(0, "ipv4", "192.0.2.1", 11000,
++                                           "192.0.2.2", 11000, "C", False,
++                                           "md5", "secret", self.params)
++    for cmds in [local_cmds, net_cmds]:
++      self.assertEqual([cmd[1] for cmd in cmds[:2]],
++                       ["new-resource", "new-minor"])
++
++  def testSyncParamsCmd(self):
++    self.assertEqual(self.cmd_gen.GenSyncParamsCmd(0, self.params),
++                     ["drbdsetup", "disk-options", 0,
++                      "--resync-rate", "1024"])
++
++  def testSyncParamsInvalid(self):
++    """dynamic-resync with c-plan-ahead=0 must raise, not return a command"""
++    self.params[constants.LDP_DYNAMIC_RESYNC] = True
++    self.params[constants.LDP_PLAN_AHEAD] = 0
++    self.assertRaises(errors.BlockDeviceError,
++                      self.cmd_gen.GenSyncParamsCmd, 0, self.params)
++
++
++class TestDRBD9CmdGenerator(testutils.GanetiTestCase):
++  """Tests the drbdsetup commands generated for DRBD 9.x kernels"""
++
++  def setUp(self):
++    testutils.GanetiTestCase.setUp(self)
++    version = {
++      "k_major": 9,
++      "k_minor": 3,
++      "k_point": 3,
++      "api": 2,
++      "proto": 118,
++      "proto2": "124",
++    }
++    self.cmd_gen = drbd_cmdgen.DRBD9CmdGenerator(version)
++    self.params = {
++      constants.LDP_BARRIERS: "n",
++      constants.LDP_NO_META_FLUSH: False,
++      constants.LDP_DISK_CUSTOM: "",
++      constants.LDP_NET_CUSTOM: "",
++      constants.LDP_DYNAMIC_RESYNC: False,
++      constants.LDP_RESYNC_RATE: 1024,
++      constants.LDP_PROTOCOL: "C",
++    }
++
++  def testResourceInitCmds(self):
++    self.assertEqual(self.cmd_gen.GenResourceInitCmds(0),
++                     [["drbdsetup", "new-resource", "resource0"],
++                      ["drbdsetup", "new-minor", "resource0", "0", "0"]])
++
++  def testShowCmd(self):
++    self.assertEqual(self.cmd_gen.GenShowCmd(0),
++                     ["drbdsetup", "show", "resource0", "--json"])
++
++  def testLocalInitCmds(self):
++    """Resource creation commands must not be part of the local init"""
++    cmds = self.cmd_gen.GenLocalInitCmds(0, "/dev/xenvg/test.data",
++                                         "/dev/xenvg/test.meta",
++                                         1024, self.params)
++    self.assertEqual([cmd[:2] for cmd in cmds],
++                     [["drbdmeta", "/dev/drbd0"],
++                      ["drbdsetup", "attach"]])
++
++  def testNetInitCmds(self):
++    """Resource creation commands must not be part of the net init"""
++    cmds = self.cmd_gen.GenNetInitCmds(0, "ipv4", "192.0.2.1", 11000,
++                                       "192.0.2.2", 11000, "C", False,
++                                       "md5", "secret", self.params)
++    self.assertEqual(len(cmds), 1)
++    self.assertEqual(cmds[0][:5],
++                     ["drbdsetup", "connect", "resource0",
++                      "ipv4:192.0.2.1:11000", "ipv4:192.0.2.2:11000"])
++
++  def testSyncParamsCmd(self):
++    self.assertEqual(self.cmd_gen.GenSyncParamsCmd(0, self.params, 1),
++                     ["drbdsetup", "peer-device-options", "resource0",
++                      "1", "0", "--resync-rate", "1024"])
++
++  def testSyncParamsInvalid(self):
++    """dynamic-resync with c-plan-ahead=0 must raise, not return a command"""
++    self.params[constants.LDP_DYNAMIC_RESYNC] = True
++    self.params[constants.LDP_PLAN_AHEAD] = 0
++    self.assertRaises(errors.BlockDeviceError,
++                      self.cmd_gen.GenSyncParamsCmd, 0, self.params, 1)
++
++  def testPauseResumeSyncCmds(self):
++    self.assertEqual(self.cmd_gen.GenPauseSyncCmd(0, 1),
++                     ["drbdsetup", "pause-sync", "resource0", "1", "0"])
++    self.assertEqual(self.cmd_gen.GenResumeSyncCmd(0, 1),
++                     ["drbdsetup", "resume-sync", "resource0", "1", "0"])
++
++  def testPrimarySecondaryCmds(self):
++    self.assertEqual(self.cmd_gen.GenPrimaryCmd(0, False),
++                     ["drbdsetup", "primary", "resource0"])
++    self.assertEqual(self.cmd_gen.GenPrimaryCmd(0, True),
++                     ["drbdsetup", "primary", "resource0", "--force"])
++    self.assertEqual(self.cmd_gen.GenSecondaryCmd(0),
++                     ["drbdsetup", "secondary", "resource0"])
++
++  def testDisconnectCmd(self):
++    self.assertEqual(self.cmd_gen.GenDisconnectCmd(0, 1),
++                     ["drbdsetup", "del-peer", "resource0", "1"])
++
++  def testInheritedCmds(self):
++    """Commands inherited from the 8.4 generator that work as-is on 9.x"""
++    self.assertEqual(self.cmd_gen.GenDownCmd(0),
++                     ["drbdsetup", "down", "resource0"])
++    self.assertEqual(self.cmd_gen.GenDetachCmd(0),
++                     ["drbdsetup", "detach", 0])
+ 
+ 
+ class TestDRBD8Create(testutils.GanetiTestCase):
