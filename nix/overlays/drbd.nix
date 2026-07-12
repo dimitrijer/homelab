@@ -9,6 +9,12 @@ self: super: {
             url = "https://github.com/LINBIT/drbd.git";
             hash = "sha256-COdio4Zh4SrPq5c0umg0shPlbfEZmO66rvrxaf3Hf5g=";
           };
+          patches = (oldAttrs.patches or [ ]) ++ [
+            # In drbd8 compat mode, forget the address-derived node id when
+            # the last connection is removed, so that pairing with a new
+            # peer (gnt-instance replace-disks) can re-arbitrate node ids.
+            ./drbd-9.3.3-compat84-forget-node-id.patch
+          ];
           preConfigure = ''
             ${oldAttrs.preConfigure or "" } 
             echo -e 'GIT-hash: ${rev}' > ./drbd/.drbd_git_revision

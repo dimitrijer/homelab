@@ -1,0 +1,26 @@
+diff --git a/drbd/drbd_nl.c b/drbd/drbd_nl.c
+index a4261a4ba..813cdefa9 100644
+--- a/drbd/drbd_nl.c
++++ b/drbd/drbd_nl.c
+@@ -5372,6 +5372,21 @@ static void del_connection(struct drbd_connection *connection, const char *tag)
+ 
+ 	mutex_lock(&resource->conf_update);
+ 	drbd_unregister_connection(connection);
++
++	/*
++	 * In drbd8 compat mode the node ids are not real configuration but
++	 * are derived from the peer addresses at connect time
++	 * (drbd_setup_node_ids_84). Forget the derived id when the last
++	 * connection goes away, so that a later pairing with a different
++	 * peer can arbitrate the node ids afresh; otherwise the stale id
++	 * can collide with the id the new pairing derives for this node.
++	 */
++	if (resource->res_opts.drbd8_compat_mode &&
++	    list_empty(&resource->connections)) {
++		drbd_info(resource, "drbd8 compat mode: forgetting node id %d\n",
++			  resource->res_opts.node_id);
++		resource->res_opts.node_id = -1;
++	}
+ 	mutex_unlock(&resource->conf_update);
+ 
+ 	/*
