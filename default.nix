@@ -3,8 +3,6 @@
 let
   sources = import ./nix/sources.nix;
   pkgs = import ./nix { inherit system; };
-  # Use nixpkgs-unstable for packages that need a newer Go toolchain
-  pkgsUnstable = import sources.nixpkgs-unstable { inherit system; };
   ovn = pkgs.callPackage ./ovn { };
   openstackPythonPackages = import ./openstack { inherit pkgs; };
   ovn-bgp-agent = pkgs.callPackage ./ovn-bgp-agent {
@@ -14,7 +12,7 @@ let
   ganeti = pkgs.callPackage ./ganeti { openvswitch = ovn; };
   ganeti-os-providers = import ./ganeti/os-providers { inherit pkgs; };
   prometheus-ganeti-exporter = pkgs.callPackage ./ganeti/prometheus-exporter { };
-  nomad-driver-virt = pkgsUnstable.callPackage ./nomad { };
+  nomad-driver-virt = pkgs.callPackage ./nomad { };
   netbuildClasses =
     let
       ganetiOverlay = self: super: ganeti-os-providers // {
