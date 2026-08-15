@@ -173,6 +173,7 @@ rec {
     ./ganeti-3.1-pandoc-3.6-man-rst.patch
     ./ganeti-3.1-disable-ssh-sandbox-pytests.patch
     ./ganeti-3.1-pytest-unit-conftest.patch
+    ./ganeti-3.1-pyopenssl-x509req.patch
 
     # additional features
     # - DRBD9 compatibility (via the kernel's drbd8 compat mode)

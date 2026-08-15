@@ -12,6 +12,16 @@ self: super: {
           fi
         '';
       });
+
+      # nixpkgs marks paste as broken because setuptools >= 82 removed
+      # pkg_resources. That only affects paste/util/template.py and
+      # paste/urlparser.py (which degrade gracefully); oslo.service uses
+      # paste.deploy via pastedeploy, which uses importlib.metadata.
+      # Disable the test suite since it requires pkg_resources.
+      paste = python-prev.paste.overridePythonAttrs (old: {
+        doCheck = false;
+        meta = (old.meta or { }) // { broken = false; };
+      });
     })
   ];
 }

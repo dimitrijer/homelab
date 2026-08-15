@@ -1,0 +1,37 @@
+diff --git a/lib/utils/x509.py b/lib/utils/x509.py
+index 07f159a12..e53f5c003 100644
+--- a/lib/utils/x509.py
++++ b/lib/utils/x509.py
+@@ -332,26 +332,23 @@
+   key_pair = OpenSSL.crypto.PKey()
+   key_pair.generate_key(OpenSSL.crypto.TYPE_RSA, constants.RSA_KEY_BITS)
+ 
+-  # Create certificate sigining request.
+-  req = OpenSSL.crypto.X509Req()
+-  req.get_subject().CN = common_name
+-  req.set_pubkey(key_pair)
+-  req.sign(key_pair, constants.X509_CERT_SIGN_DIGEST)
+-
+   # Load the certificates used for signing.
+   signing_key = OpenSSL.crypto.load_privatekey(
+       OpenSSL.crypto.FILETYPE_PEM, signing_cert_pem)
+   signing_cert = OpenSSL.crypto.load_certificate(
+       OpenSSL.crypto.FILETYPE_PEM, signing_cert_pem)
+ 
+-  # Create a certificate and sign it.
++  # Create a certificate and sign it directly, without an intermediate
++  # certificate signing request. pyOpenSSL >= 25 removed
++  # OpenSSL.crypto.X509Req, and the request carried no information that is
++  # not also provided here.
+   cert = OpenSSL.crypto.X509()
+-  cert.set_subject(req.get_subject())
++  cert.get_subject().CN = common_name
+   cert.set_serial_number(serial_no)
+   cert.gmtime_adj_notBefore(0)
+   cert.gmtime_adj_notAfter(validity)
+   cert.set_issuer(signing_cert.get_subject())
+-  cert.set_pubkey(req.get_pubkey())
++  cert.set_pubkey(key_pair)
+   cert.sign(signing_key, constants.X509_CERT_SIGN_DIGEST)
+ 
+   # Encode the key and certificate in PEM format.
