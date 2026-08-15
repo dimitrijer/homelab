@@ -21,6 +21,7 @@ ALL_IMAGES=(
     audiobookshelf
     calibre-web
     ganeti-node
+    immich
     jellyfin
     metrics
     navidrome

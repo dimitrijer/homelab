@@ -15,6 +15,8 @@ let
 
   uptime-kuma = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDENRx978MoVNtHbsf3DEXdJG3c9qgquHdYPeSEvQMd8VtYkRfN7oRh07Sr+1zFSjvZ4I2NMOaF+xOa/Vluu9Rqi3zNZDdW9Ov58+MO6GTx0IrYx/3NYWjtJ/vzewJFg95uts8YYIQynX8ZHidYZoTy7Da5W6+hHv6sD4qYpSYcQgPFsnOfb+ycaYM4Cs7fNdfOXRqqEFV+M1TafBTuoolAnySGaYMgnY6lxsObMh1LVJAgEfcWL8nolbq4bKcfiGO54AmFW57lCdC4AQrkhEW+uV0x4p3MppQALE76zn2j4c5X5xR4mr9+VmL0+KLNTQc5QSEuTjFOBWcBsQeqFudR946lSp8mWHaofccT/9uVi8S6hTIpFj+YWAgESZdNIhqX7Gus823e4+mQUmVksv930Q/MF7Pxbyw6mIaoTp5o+cAnPHXinvCW3cCnSpW6a42T4cK3xIfgjgOp8QgSzqFt7aiek8VTtvAiY2o7YzqB0zg7cHzSIoGAaNNpL3nrNPM= root@uptime-kuma";
 
+  immich = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCsbrXeRij0+Nt8leJ7vcaf/lEYVsJzh2mM6oQtMgEdoU/Q/Ap9Wdy6XkSulRK7ZRBK8kyPHTlAs6Kk0OaIoI2hg9ki4xPBxvLNx/TgEQq8djUJLvqMCwdUbJIbQE9d3QGzbccS/IVuC6d5nm7Anu3bdGq2Lu74Vd7S8TOm1urLBTWn6Lvt19/hV72OOBuFZBCMJR0iiS6SL6syTm0tthNeFOBwU4hDj+pK5Qi4XiEkPbxBz7dp6dgownXqcIYmvyFWv5gChemTug3HxGbk/m+19c/9G9Q18/QioCmFc2TeYMh+3+kiJ0pPBgySTD+YyG8unVKrNVf4qh2WnHmc+dUw5zu1V2DsngJuZ+vwzjyjx8QdGxB3sQY62LlQ4+nFHWhcrzkFBfxvXNOOsXgYIRbrbTZJ6HxD+fkyeHWYiunA2UlTCb7ylYV6rjFhtuub9sSR7k3q6qeTkNbS1fZgE2Ys2SfFC42FFxcys6hYqG1pepZ4TFZky+nJouH0M9XPnmc= root@immich";
+
   needAcme = [
     navidrome
     calibre-web
@@ -24,6 +26,7 @@ let
     jellyfin
     adguard-home
     uptime-kuma
+    immich
   ];
 in
 {

@@ -138,6 +138,10 @@ in
     className = "jellyfin";
     modules = [ ./classes/jellyfin.nix ];
   };
+  immich = mkNetbuild {
+    className = "immich";
+    modules = [ ./classes/immich.nix ];
+  };
   adguard-home = mkNetbuild {
     className = "adguard-home";
     modules = [ ./classes/adguard-home.nix ];

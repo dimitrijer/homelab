@@ -13,6 +13,7 @@ INSTANCES=(
   jellyfin
   adguard-home
   uptime-kuma
+  immich
 )
 
 scp -r mikrotik.london:/usb1-part1/http/keys .
