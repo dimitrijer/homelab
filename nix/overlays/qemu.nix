@@ -16,7 +16,6 @@ let
     usbredirSupport = false;
     xenSupport = false;
     cephSupport = false;
-    glusterfsSupport = false;
     openGLSupport = false;
     virglSupport = false;
   };
