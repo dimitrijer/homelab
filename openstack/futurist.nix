@@ -47,6 +47,25 @@ buildPythonPackage rec {
     oslo-log
   ];
 
+  # Python 3.14 changed the default multiprocessing start method to
+  # "forkserver". Under stestr's process model, a forked child process runs the
+  # inherited _remove_temp_dir finalizer and deletes the parent's pymp-* temp
+  # directory, which also holds the forkserver's control socket. The next
+  # connect_to_new_process then fails with ENOENT, and every (process) scenario
+  # test fails with "FileNotFoundError". Forcing the "fork" start method avoids
+  # the forkserver socket entirely and the whole suite passes.
+  preCheck = ''
+    mkdir -p $TMPDIR/sitecustomize
+    cat > $TMPDIR/sitecustomize/sitecustomize.py << 'PYEOF'
+import multiprocessing as mp
+try:
+    mp.set_start_method("fork")
+except RuntimeError:
+    pass
+PYEOF
+    export PYTHONPATH="$TMPDIR/sitecustomize''${PYTHONPATH:+:$PYTHONPATH}"
+  '';
+
   checkPhase = ''
     runHook preCheck
     stestr run
