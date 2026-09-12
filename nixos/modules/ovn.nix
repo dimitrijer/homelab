@@ -35,7 +35,35 @@ in
       ];
     };
 
+    # The nixpkgs openvswitch module starts ovsdb-server through systemd
+    # socket activation (ovsdb.socket + `--remote=pfd:3`), which needs the
+    # OVS >= 4.0.
+    systemd.sockets.ovsdb = {
+      enable = false;
+      wantedBy = mkForce [ ];
+    };
     systemd.services = {
+      ovsdb = {
+        requires = mkForce [ ];
+        after = mkForce [ ];
+        serviceConfig.ExecStart = mkForce ''
+          ${pkgs.ovn}/bin/ovsdb-server \
+            --remote=punix:/run/openvswitch/db.sock \
+            --private-key=db:Open_vSwitch,SSL,private_key \
+            --certificate=db:Open_vSwitch,SSL,certificate \
+            --bootstrap-ca-cert=db:Open_vSwitch,SSL,ca_cert \
+            --unixctl=ovsdb.ctl.sock \
+            --pidfile=/run/openvswitch/ovsdb.pid \
+            --detach \
+            /var/db/openvswitch/conf.db
+        '';
+      };
+      ovs-vswitchd = {
+        requires = mkForce [ ];
+        bindsTo = [ "ovsdb.service" ];
+        after = mkForce [ "ovsdb.service" ];
+      };
+
       "ovn-controller" = {
         description = "OVN controller daemon";
         requires = [ "ovs-vswitchd.service" ];
