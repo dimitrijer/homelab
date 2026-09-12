@@ -80,6 +80,12 @@ in
         };
         initialMasterNode = "aleph";
         osProviders = [ pkgs.ganeti-os-pxe ];
+        # Custom variants (see nix/overlays/*.nix); each is a separate attribute
+        # so that the stock packages, and everything Hydra caches on top of
+        # them, stay untouched.
+        qemuPackage = pkgs.qemu-minimal;
+        drbdPackage = pkgs.drbd-utils-9;
+        ovmfPackage = pkgs.OVMF-nosmm.fd;
         rapiUsers = [
           {
             user = prometheusExporterUser.user;
@@ -133,6 +139,7 @@ in
 
       services.nomad = {
         enable = true;
+        package = pkgs.nomad-bin;
         driverVirtPackage = pkgs.nomad-driver-virt;
         openFirewall = true;
         bootstrapExpect = 3;
@@ -177,8 +184,8 @@ in
           # Enable forwarding (needed for ovn-bgp-agent)
           "net.ipv4.ip_forward" = 1;
         };
-        extraModulePackages = with config.boot.kernelPackages; [
-          drbd # DRBD 9.x
+        extraModulePackages = [
+          (pkgs.drbd-kernel-module config.boot.kernelPackages) # DRBD 9.x
         ];
       };
 
@@ -294,7 +301,6 @@ in
           vim
           swtpm # for TPM support
           vdo # for vdoformat
-          qemu
           iftop
           sysstat # iostat, sar
           pciutils # lspci

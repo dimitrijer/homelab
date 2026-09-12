@@ -3,42 +3,33 @@
 let
   sources = import ./nix/sources.nix;
   pkgs = import ./nix { inherit system; };
-  ovn = pkgs.callPackage ./ovn { };
-  openstackPythonPackages = import ./openstack { inherit pkgs; };
-  ovn-bgp-agent = pkgs.callPackage ./ovn-bgp-agent {
-    inherit openstackPythonPackages;
-    ovs = ovn;
+
+  netbuildClasses = import ./nixos/default.nix {
+    inherit pkgs;
+    disko = sources.disko;
+    agenix = sources.agenix;
   };
-  ganeti = pkgs.callPackage ./ganeti { openvswitch = ovn; };
-  ganeti-os-providers = import ./ganeti/os-providers { inherit pkgs; };
-  prometheus-ganeti-exporter = pkgs.callPackage ./ganeti/prometheus-exporter { };
-  nomad-driver-virt = pkgs.callPackage ./nomad { };
-  netbuildClasses =
-    let
-      ganetiOverlay = self: super: ganeti-os-providers // {
-        inherit ganeti prometheus-ganeti-exporter;
-      };
-      ovnOverlay = self: super: {
-        inherit ovn ovn-bgp-agent;
-      };
-      nomadOverlay = self: super: {
-        inherit nomad-driver-virt;
-      };
-    in
-    import ./nixos/default.nix {
-      # Expose ganeti in pkgs.
-      pkgs = import ./nix {
-        inherit system;
-        overlays = [ ganetiOverlay ovnOverlay nomadOverlay ];
-        # Nomad is licensed under BSL
-        config.allowUnfreePredicate = pkg:
-          builtins.elem (pkgs.lib.getName pkg) [ "nomad" ];
-      };
-      disko = sources.disko;
-      agenix = sources.agenix;
-    };
+
+  # A directory of deploy scripts, one per image, so that any subset of images
+  # can be built with a single nix-build invocation (one evaluation, and Nix
+  # schedules all builds together):
+  #   ./result/<image>/bin/deploy
+  mkDeployFarm = names: pkgs.linkFarm "netbuilds"
+    (map (name: { inherit name; path = netbuildClasses.${name}.deploy; }) names);
 in
 {
-  inherit ovn ovn-bgp-agent ganeti ganeti-os-providers nomad-driver-virt prometheus-ganeti-exporter;
+  inherit (pkgs)
+    ovn
+    ovn-bgp-agent
+    ganeti
+    ganeti-os-pxe
+    nomad-driver-virt
+    nomad-bin
+    prometheus-ganeti-exporter;
+
   nginx = import ./nginx/default.nix { pkgs = pkgs.pkgsCross.aarch64-multiplatform; };
+
+  inherit mkDeployFarm;
+  imageNames = builtins.attrNames netbuildClasses;
+  all = mkDeployFarm (builtins.attrNames netbuildClasses);
 } // netbuildClasses

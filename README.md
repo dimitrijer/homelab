@@ -16,7 +16,11 @@ using files in this repo.
   `nixpkgs-unstable` to build everything, and I bump the reference every now
   and then..
 
-- `ganeti/default.nix` is Ganeti 3.1.0 derivation.
+- `ganeti/default.nix` is Ganeti 3.1 (git master) derivation.
+
+- `nix/overlays` holds the custom package variants (trimmed down QEMU,
+  non-SMM Secure Boot OVMF, DRBD 9.x) and the overlay that puts every
+  repo-local package into `pkgs`.
 
 - `ganeti/os-providers/default.nix` is an attribute set of derivations of
   Ganeti OS providers. So far I only make use of
@@ -34,12 +38,16 @@ using files in this repo.
 - `nixos/default.nix` contains NixOS image definitions that I call _classes_.
   Each class represents a different image. Right now there are:
   - `ganeti-node` that nodes in the cluster boot from; this is the only image
-    that physical boxes use
+    that physical boxes use. Besides Ganeti it runs OVN, FRR (BGP peering with
+    the router), ovn-bgp-agent and a Nomad agent with
+    [nomad-driver-virt](https://github.com/dimitrijer/nomad-driver-virt).
   - `navidrome`
   - `calibre-web` for [Calibre web server](https://github.com/janeczku/calibre-web)
   - `jellyfin`
+  - `immich`
   - `adguard-home`
-  - `audibookshelf`
+  - `audiobookshelf`
+  - `uptime-kuma`
   - `paperless` for Paperless-ngx
   - `metrics` for Grafana
 

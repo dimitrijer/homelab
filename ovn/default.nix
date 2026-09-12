@@ -9,7 +9,6 @@
 , libbpf
 , libcap_ng
 , libtool
-, nix-update-script
 , numactl
 , openssl
 , pkg-config
@@ -50,7 +49,6 @@ stdenv.mkDerivation rec {
   buildInputs = [
     perl
     procps
-    python3
     util-linux
     which
     libcap_ng
@@ -144,8 +142,6 @@ stdenv.mkDerivation rec {
     export OVS_RESOLV_CONF="$PWD/resolv.conf"
     touch $OVS_RESOLV_CONF
   '';
-
-  passthru.updateScript = nix-update-script { };
 
   meta = with lib; {
     description = "Open Virtual Network";

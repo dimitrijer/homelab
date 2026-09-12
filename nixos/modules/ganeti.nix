@@ -88,6 +88,27 @@ in
       type = types.bool;
       default = false;
     };
+    qemuPackage = mkOption {
+      type = types.package;
+      default = pkgs.qemu_kvm;
+      defaultText = literalExpression "pkgs.qemu_kvm";
+      description = "QEMU used for instances (provides qemu-kvm in the system profile; also handed to libvirtd)";
+    };
+    drbdPackage = mkOption {
+      type = types.package;
+      default = pkgs.drbd;
+      defaultText = literalExpression "pkgs.drbd";
+      description = "drbd-utils (drbdadm, drbdsetup, drbdmeta) to put in the system profile";
+    };
+    ovmfPackage = mkOption {
+      type = types.package;
+      default = pkgs.OVMF.fd;
+      defaultText = literalExpression "pkgs.OVMF.fd";
+      description = ''
+        UEFI firmware, exposed at the stable path /etc/ganeti/ovmf/ so that kvm
+        hypervisor parameters need not reference a store path.
+      '';
+    };
   };
 
   config =
@@ -115,11 +136,8 @@ in
         };
         interfaces = {
           "${cfg.primaryInterface}".useDHCP = false;
+        } // lib.optionalAttrs (cfg.secondaryInterface == null) {
           br0.useDHCP = true;
-        } // lib.optionalAttrs (cfg.secondaryInterface != null) {
-          "${cfg.secondaryInterface}" = {
-            useDHCP = true;
-          };
         };
 
         search = [ cfg.domain ];
@@ -166,9 +184,9 @@ in
       systemd.network = mkIf (cfg.secondaryInterface != null) {
         enable = true;
         wait-online.ignoredInterfaces = [ "${cfg.primaryInterface}" ];
-        # Configuration for enp3s0 (VLAN 97 interface)
-        networks."10-enp3s0" = {
-          matchConfig.Name = "enp3s0";
+        # Secondary (DRBD replication) interface
+        networks."10-${cfg.secondaryInterface}" = {
+          matchConfig.Name = cfg.secondaryInterface;
           networkConfig = {
             DHCP = "yes";
             KeepConfiguration = "no";
@@ -206,7 +224,7 @@ in
       virtualisation.libvirtd = mkIf cfg.libvirtEnabled {
         enable = true;
         qemu = {
-          package = pkgs.qemu;
+          package = cfg.qemuPackage;
           runAsRoot = true;
           swtpm.enable = true;
         };
@@ -286,24 +304,26 @@ in
               EOF
 
               echo "Configuring RAPI users..."
-              cat - <<EOF
+              cat >/var/lib/ganeti/rapi/users <<EOF
               ${rapiUsers}
-              EOF >/var/lib/ganeti/rapi/users
+              EOF
 
               chown gnt-rapi:gnt-masterd /var/lib/ganeti/rapi/users
 
               ${addNodesCmd}
             '';
         in
-        with pkgs;
         [
-          drbd
-          qemu
-          lvm2
-          ganeti
+          cfg.drbdPackage
+          cfg.qemuPackage
+          pkgs.lvm2
+          pkgs.ganeti
           setupClusterScript
           osProvidersPackage
         ];
+
+      # Stable path for UEFI firmware (OVMF_CODE.fd, OVMF_VARS.fd, ...).
+      environment.etc."ganeti/ovmf".source = "${cfg.ovmfPackage}/FV";
 
       boot.kernelModules = [
         "kvm-intel"

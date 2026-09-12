@@ -1,12 +1,9 @@
+# OpenStack python libraries that nixpkgs does not ship (or ships in a form
+# that does not work for ovn-bgp-agent).
 { pkgs }:
 
 let
   python = pkgs.python3;
-
-  # Import python-ovs from ovn directory
-  python-ovs = pkgs.callPackage ../ovn/python-ovs.nix {
-    inherit (python.pkgs) buildPythonPackage fetchPypi setuptools sortedcontainers;
-  };
 
   callPackage = pkgs.newScope (self // {
     inherit (pkgs) fetchFromGitHub;
@@ -21,54 +18,26 @@ let
   });
 
   self = {
-    # OVS Python bindings (from ovn directory)
-    ovs = python-ovs;
+    # OVS python bindings
+    ovs = callPackage ./ovs.nix { };
 
     # Oslo libraries
     oslo-rootwrap = callPackage ./oslo-rootwrap.nix { };
-
     oslo-privsep = callPackage ./oslo-privsep.nix { };
-
     futurist = callPackage ./futurist.nix { };
-
     oslo-middleware = callPackage ./oslo-middleware.nix { };
-
-    oslo-service = callPackage ./oslo-service.nix {
-      oslo-privsep = self.oslo-privsep;
-    };
-
-    oslo-messaging = callPackage ./oslo-messaging.nix {
-      futurist = self.futurist;
-      oslo-middleware = self.oslo-middleware;
-      oslo-service = self.oslo-service;
-    };
-
+    oslo-service = callPackage ./oslo-service.nix { };
+    oslo-messaging = callPackage ./oslo-messaging.nix { };
     oslo-policy = callPackage ./oslo-policy.nix { };
-
-    oslo-versionedobjects = callPackage ./oslo-versionedobjects.nix {
-      oslo-messaging = self.oslo-messaging;
-    };
+    oslo-versionedobjects = callPackage ./oslo-versionedobjects.nix { };
 
     # OpenStack utilities
     os-traits = callPackage ./os-traits.nix { };
-
-    os-ken = callPackage ./os-ken.nix {
-      ovs = self.ovs;
-    };
+    os-ken = callPackage ./os-ken.nix { };
 
     # OVS and Neutron libraries
-    ovsdbapp = callPackage ./ovsdbapp.nix {
-      ovs = self.ovs;
-    };
-
-    neutron-lib = callPackage ./neutron-lib.nix {
-      os-ken = self.os-ken;
-      oslo-messaging = self.oslo-messaging;
-      oslo-policy = self.oslo-policy;
-      oslo-versionedobjects = self.oslo-versionedobjects;
-      os-traits = self.os-traits;
-      oslo-service = self.oslo-service;
-    };
+    ovsdbapp = callPackage ./ovsdbapp.nix { };
+    neutron-lib = callPackage ./neutron-lib.nix { };
   };
 in
 self

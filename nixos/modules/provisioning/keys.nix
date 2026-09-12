@@ -8,9 +8,15 @@ in
 {
   options.provisioning.keys = {
     enable = mkEnableOption "enable provisioning of root and host keys";
+    host = mkOption {
+      type = types.str;
+      default = "boot.homelab.tel";
+      description = "boot server that serves the per-host key tarballs";
+    };
     baseUrl = mkOption {
       type = types.str;
       default = "/keys";
+      description = "path on the boot server under which <hostname>.tar.gz lives";
     };
   };
 
@@ -42,7 +48,7 @@ in
           # non-zero, sshd's Requires= dep fails and systemd does NOT re-queue
           # sshd when provision-keys later recovers.
           curl --fail --retry 60 --retry-delay 5 --retry-connrefused --retry-all-errors -sLO \
-            "http://boot.homelab.tel${cfg.baseUrl}/$HOSTNAME.tar.gz"
+            "http://${cfg.host}${cfg.baseUrl}/$HOSTNAME.tar.gz"
           umask 077
           tar -xzvf $HOSTNAME.tar.gz
           cp host_privkey $host_key_path

@@ -3,9 +3,12 @@
 , fetchgit
 , autoreconfHook
 , makeWrapper
-, breakpointHook
-, ghc
+, haskellPackages # provides ghc + Ganeti's Haskell library dependencies
 , python3
+, pandoc # rst -> man generation
+, cabal-install
+, hscolour # hsapi documentation
+, hlint
 , coreutils
 , util-linux
 , procps
@@ -25,10 +28,8 @@
 , drbd
 , man
 , graphviz
-, qemu-utils # for ovfimport
-, qemu
+, qemu-utils # qemu-img: ovfimport, disk conversion
 , glibcLocales
-, OVMF # for UEFI boot / SecureBoot
 , withDocs ? true
 , withLinting ? false
 , withCoverage ? false
@@ -60,9 +61,9 @@ let
       lib.optionals
         withCoverage [ coverage ]
       );
-  ghcWithPackages = ghc.ghcWithPackages (ps: with ps;
+
+  ghcWithPackages = haskellPackages.ghcWithPackages (ps: with ps;
     [
-      cabal-install
       ps.curl
       json
       network
@@ -87,47 +88,18 @@ let
       snap-server # for monitoring
       PSQueue # for monitoring
       # unit test dependencies below
-      hlint
       QuickCheck
       test-framework
       test-framework-hunit
       test-framework-quickcheck2
-    ] ++ lib.optionals withDocs [
-      hscolour # hsapi documentation
-      pandoc-cli # for rst -> man generation
-    ] ++ lib.optionals withLinting [
-      hlint
     ]);
 
   ganetiRev = "274c9fe45aec59bd7d98957afb6800d2bd7066af";
-in
-stdenv.mkDerivation
-rec {
-  pname = "ganeti";
-  version = "unstable-2026-05-16";
-  src = fetchgit {
-    url = "https://github.com/ganeti/ganeti.git";
-    rev = ganetiRev;
-    hash = "sha256-KDawW8bs5DvAejUl2Mu0SetEZ5hPZU0smQX9jpgo3ZI=";
-  };
 
-  nativeBuildInputs = [
-    autoreconfHook
-    breakpointHook
-    makeWrapper
-    fakeroot # for tests requiring fakeroot
-    coreutils
-    glibcLocales
-  ];
-
-  nativeCheckInputs = [
-    fakeroot
-    openssh
-    procps
-    coreutils
-  ];
-
-  propagatedBuildInputs = [
+  # Programs the Ganeti daemons, CLI and tools invoke at runtime. They are also
+  # build inputs because ./configure looks some of them up (ip, socat, qemu-img)
+  # and bakes the paths into the constants.
+  runtimeInputs = [
     iproute2
     socat
     qemu-utils
@@ -143,19 +115,43 @@ rec {
     openssh
     openvswitch
     multipath-tools
-    systemd
     drbd
-    OVMF
+  ];
+in
+stdenv.mkDerivation
+rec {
+  pname = "ganeti";
+  version = "unstable-2026-05-16";
+  src = fetchgit {
+    url = "https://github.com/ganeti/ganeti.git";
+    rev = ganetiRev;
+    hash = "sha256-KDawW8bs5DvAejUl2Mu0SetEZ5hPZU0smQX9jpgo3ZI=";
+  };
+
+  nativeBuildInputs = [
+    autoreconfHook
+    makeWrapper
+    fakeroot # for tests requiring fakeroot
+    coreutils
+    glibcLocales
+    cabal-install
+  ]
+  ++ lib.optionals withDocs [ pandoc hscolour graphviz ]
+  ++ lib.optionals withLinting [ hlint ];
+
+  nativeCheckInputs = [
+    fakeroot
+    openssh
+    procps
+    coreutils
   ];
 
-  buildInputs = [
+  buildInputs = runtimeInputs ++ [
     curl
     pythonWithPackages
     ghcWithPackages
     man # for man pages
-  ]
-  ++ lib.optionals withDocs [ graphviz ]
-  ;
+  ];
 
   patches = [
     # patches from https://github.com/jfut/ganeti-rpm
@@ -204,7 +200,10 @@ rec {
     "--with-sshd-restart-command=systemctl restart sshd.service"
     "--with-user-prefix=gnt-"
     "--with-group-prefix=gnt-"
-    "--with-kvm-path=${qemu.out}/bin/qemu-kvm"
+    # Default for the kvm_path hypervisor parameter. Resolved through the
+    # system profile (the Ganeti NixOS module puts QEMU there) rather than a
+    # store path, so that a QEMU change does not rebuild Ganeti.
+    "--with-kvm-path=/run/current-system/sw/bin/qemu-kvm"
     "--enable-monitoring"
     "--enable-metadata"
     "--enable-haskell-tests"
@@ -227,19 +226,14 @@ rec {
       --replace "/usr/bin/env" "${coreutils.out}/bin/env" \
   '';
 
-  # Add py-tests-unit and py-tests-integration at some point.
-  checkPhase =
-    let
-      maybeLint = if withLinting then "make lint" else "";
-      maybeCoverage = if withCoverage then "make coverage" else "";
-    in
-    ''
-      runHook preCheck
-      make hs-tests py-tests-legacy py-tests-unit
-      ${maybeLint}
-      ${maybeCoverage}
-      runHook postCheck
-    '';
+  # Add py-tests-integration at some point.
+  checkPhase = ''
+    runHook preCheck
+    make hs-tests py-tests-legacy py-tests-unit
+    ${lib.optionalString withLinting "make lint"}
+    ${lib.optionalString withCoverage "make coverage"}
+    runHook postCheck
+  '';
 
   postFixup =
     let
@@ -280,33 +274,31 @@ rec {
         "$out/bin/gnt-os"
       ];
       tools = [
-        "$out/lib/ganeti/tools/master-ip-setup"
         "$out/lib/ganeti/tools/burnin"
-        "$out/lib/ganeti/tools/cfgupgrade"
-        "$out/lib/ganeti/tools/cluster-merge"
-        "$out/lib/ganeti/tools/fmtjson"
-        "$out/lib/ganeti/tools/lvmstrap"
-        "$out/lib/ganeti/tools/move-instance"
-        "$out/lib/ganeti/tools/ovfconverter"
-        "$out/lib/ganeti/tools/query-config"
-        "$out/lib/ganeti/tools/users-setup"
-        "$out/lib/ganeti/tools/xen-console-wrapper"
         "$out/lib/ganeti/tools/cfgshell"
+        "$out/lib/ganeti/tools/cfgupgrade"
         "$out/lib/ganeti/tools/cfgupgrade12"
+        "$out/lib/ganeti/tools/cluster-merge"
         "$out/lib/ganeti/tools/confd-client"
+        "$out/lib/ganeti/tools/fmtjson"
         "$out/lib/ganeti/tools/kvm-console-wrapper"
+        "$out/lib/ganeti/tools/lvmstrap"
         "$out/lib/ganeti/tools/master-ip-setup"
+        "$out/lib/ganeti/tools/move-instance"
         "$out/lib/ganeti/tools/node-cleanup"
+        "$out/lib/ganeti/tools/ovfconverter"
         "$out/lib/ganeti/tools/post-upgrade"
+        "$out/lib/ganeti/tools/query-config"
         "$out/lib/ganeti/tools/sanitize-config"
+        "$out/lib/ganeti/tools/users-setup"
         "$out/lib/ganeti/tools/vcluster-setup"
+        "$out/lib/ganeti/tools/xen-console-wrapper"
       ];
-      binPath = lib.makeBinPath propagatedBuildInputs;
+      binPath = lib.makeBinPath runtimeInputs;
     in
-    lib.intersperse "\n"
-      (map
-        (prog: "wrapProgram ${prog} --prefix PATH : \"${binPath}\"")
-        (daemons ++ htools ++ pythonBinaries ++ tools));
+    lib.concatMapStringsSep "\n"
+      (prog: "wrapProgram ${prog} --prefix PATH : \"${binPath}\"")
+      (daemons ++ htools ++ pythonBinaries ++ tools);
 
   installPhase = ''
     make install

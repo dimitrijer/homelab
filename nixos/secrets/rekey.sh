@@ -1,8 +1,12 @@
-#!/bin/sh
+#!/usr/bin/env bash
+#
+# Re-encrypt all secrets for the current set of host keys. Fetches the
+# provisioned key tarballs from the boot server, extracts every host's private
+# key and passes them all to `agenix --rekey`.
 
 set -euo pipefail
 
-rm -rf ./keys
+cd "$(dirname "$0")"
 
 INSTANCES=(
   calibre-web
@@ -16,26 +20,16 @@ INSTANCES=(
   immich
 )
 
+rm -rf ./keys
+trap 'rm -rf ./keys' EXIT
+
 scp -r mikrotik.london:/usb1-part1/http/keys .
 
-pushd keys
-for instance in ${INSTANCES[@]}; do
-    mkdir "$instance"
-    mv "./$instance.tar.gz" "$instance"
-    pushd "$instance"
-    tar -xzvf "./$instance.tar.gz"
-    popd
+identities=()
+for instance in "${INSTANCES[@]}"; do
+  mkdir "keys/$instance"
+  tar -xzf "keys/$instance.tar.gz" -C "keys/$instance"
+  identities+=(-i "keys/$instance/host_privkey")
 done
-popd
 
-agenix --rekey \
-    -i keys/calibre-web/host_privkey \
-    -i keys/metrics/host_privkey \
-    -i keys/navidrome/host_privkey \
-    -i keys/paperless/host_privkey \
-    -i keys/audiobookshelf/host_privkey \
-    -i keys/jellyfin/host_privkey \
-    -i keys/adguard-home/host_privkey \
-    -i keys/uptime-kuma/host_privkey
-
-rm -rf keys
+agenix --rekey "${identities[@]}"

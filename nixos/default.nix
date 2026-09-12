@@ -27,6 +27,7 @@ let
                   # Allow "nixos-rebuild" to work properly by providing
                   # /etc/nixos/configuration.nix.
                   (modulesPath + "/profiles/clone-config.nix")
+                  ./modules/provisioning/keys.nix
                 ];
                 config = {
                   installer.cloneConfigIncludes = modules;
@@ -39,6 +40,8 @@ let
                     enable = true;
                     inherit storeUrl;
                   };
+                  # Keys are served by the same host as the images.
+                  provisioning.keys.host = lib.mkDefault deployHost;
                 };
               })
           ];

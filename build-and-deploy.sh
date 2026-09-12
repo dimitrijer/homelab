@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Build and deploy netboot images to the boot server.
 #
@@ -13,34 +13,22 @@
 #   ./build-and-deploy.sh                      # Build and deploy all images
 #   ./build-and-deploy.sh ganeti-node          # Build and deploy single image
 #   ./build-and-deploy.sh jellyfin navidrome   # Build and deploy multiple images
+#
+# All requested images are built with a single nix-build invocation (one
+# evaluation; Nix schedules the builds of all images together), producing
+# ./result/<image>/bin/deploy for each of them.
 
 set -eu -o pipefail
 
-ALL_IMAGES=(
-    adguard-home
-    audiobookshelf
-    calibre-web
-    ganeti-node
-    immich
-    jellyfin
-    metrics
-    navidrome
-    paperless
-    uptime-kuma
-)
+cd "$(dirname "$0")"
+
+mapfile -t ALL_IMAGES < <(nix-instantiate --eval --strict --raw \
+    -E 'builtins.concatStringsSep "\n" (import ./. { }).imageNames')
 
 if [[ $# -gt 0 ]]; then
     IMAGES=("$@")
-    # Validate that all specified images are known
     for image in "${IMAGES[@]}"; do
-        found=0
-        for valid in "${ALL_IMAGES[@]}"; do
-            if [[ "$image" == "$valid" ]]; then
-                found=1
-                break
-            fi
-        done
-        if [[ $found -eq 0 ]]; then
+        if [[ ! " ${ALL_IMAGES[*]} " == *" $image "* ]]; then
             echo "Unknown image: $image" >&2
             echo "Valid images: ${ALL_IMAGES[*]}" >&2
             exit 1
@@ -50,14 +38,14 @@ else
     IMAGES=("${ALL_IMAGES[@]}")
 fi
 
-echo "==="
-for image in "${IMAGES[@]}"
-do
-    echo "Building $image..."
-    nix-build -I . -A "${image}" -o "$image"
-    echo "Deploying $image..."
-    "./$image/bin/deploy" ~/.ssh/id_ed25519
-    echo "==="
+names=$(printf '"%s" ' "${IMAGES[@]}")
+
+echo "=== Building: ${IMAGES[*]}"
+nix-build -o result -E "(import ./. { }).mkDeployFarm [ $names ]"
+
+for image in "${IMAGES[@]}"; do
+    echo "=== Deploying $image..."
+    "./result/$image/bin/deploy" ~/.ssh/id_ed25519
 done
 
 echo

@@ -41,10 +41,9 @@ in
       bgpd.enable = true;
     };
 
-    # Override the static frr.conf with a mutable one
-    environment.etc."frr/frr.conf" = mkForce {
-      enable = false;  # Disable the static symlink
-    };
+    # /etc/frr/frr.conf becomes a symlink to this per-node file, which the
+    # frr preStart below generates from /etc/default/cluster.
+    services.frr.configFile = "/var/lib/frr/frr.conf";
 
     # Create log and config directories for frr
     systemd.tmpfiles.rules = [
@@ -57,7 +56,7 @@ in
       allowedTCPPorts = [ 179 ];
     };
 
-    # Generate FRR config at runtime with substituted values
+    # Generate FRR config at runtime with node-specific values
     systemd.services.frr = {
       after = [ "provision-cluster-config.service" ];
       requires = [ "provision-cluster-config.service" ];
@@ -108,9 +107,6 @@ ip protocol bgp route-map rm-only-default
 ip nht resolve-via-default
 end
 EOF
-
-        # Create symlink from /etc/frr/frr.conf to our generated config
-        ln -sf /var/lib/frr/frr.conf /etc/frr/frr.conf
 
         echo "Generated /var/lib/frr/frr.conf for node $CLUSTER_HOSTNAME with router-id $CLUSTER_NODE_ADDRESS"
       '';

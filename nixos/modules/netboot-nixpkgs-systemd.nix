@@ -152,12 +152,36 @@ in
           export http_proxy="${cfg.httpProxy}"
         fi
 
+        WGET=${pkgs.wget}/bin/wget
+
+        # Expected sha256 of the store, as published next to it. Empty when
+        # the boot server does not serve it.
+        fetch_remote_hash() {
+          $WGET -q -O - "$HASH_URL" 2>/dev/null | cut -d' ' -f1
+        }
+
+        # Verify a downloaded squashfs against the expected hash. Returns 1 on
+        # mismatch; a missing expected hash is tolerated with a warning.
+        verify_squashfs() {
+          local file="$1" expected="$2" actual
+          if [ -z "$expected" ]; then
+            echo "Warning: no remote hash available, skipping verification of $file"
+            return 0
+          fi
+          actual=$(sha256sum "$file" | cut -d' ' -f1)
+          if [ "$actual" = "$expected" ]; then
+            echo "Verified $file (sha256=$actual)"
+            return 0
+          fi
+          echo "ERROR: checksum mismatch for $file: expected=$expected actual=$actual"
+          return 1
+        }
+
         # Function to check if cache is stale using hash comparison
         # Returns 0 for stale, and 1 for fresh.
         is_cache_stale() {
           local cache_file="$1"
           local hash_cache="$2"
-          local hash_url="$3"
 
           # If cache file doesn't exist, it's stale
           if [ ! -f "$cache_file" ]; then
@@ -171,8 +195,7 @@ in
             return 0
           fi
 
-          # Fetch remote hash
-          local remote_hash=$(${pkgs.wget}/bin/wget -q -O - "$hash_url" 2>/dev/null)
+          local remote_hash=$(fetch_remote_hash)
           if [ -z "$remote_hash" ]; then
             echo "Failed to fetch remote hash, assuming stale"
             return 0
@@ -192,32 +215,36 @@ in
         }
 
         download_to_cache() {
+          local expected
           mkdir -p "$(dirname "$CACHE_PATH")"
-          if ${pkgs.wget}/bin/wget -q -O "$CACHE_PATH" "$STORE_URL"; then
+          expected=$(fetch_remote_hash)
+          if $WGET -q -O "$CACHE_PATH" "$STORE_URL" && verify_squashfs "$CACHE_PATH" "$expected"; then
             echo "Download to cache complete, size: $(du -h "$CACHE_PATH" | cut -f1)"
-            # Save the hash file
-            if ${pkgs.wget}/bin/wget -q -O "$HASH_CACHE_PATH" "$HASH_URL"; then
+            if [ -n "$expected" ]; then
+              echo "$expected" > "$HASH_CACHE_PATH"
               echo "Hash file saved"
             else
-              echo "Warning: Failed to save hash file"
+              # Without a hash the cache is treated as stale on the next boot.
+              rm -f "$HASH_CACHE_PATH"
             fi
             TARGET_SQUASHFS="$CACHE_PATH"
             return 0
           else
-            echo "Download to cache failed, cleaning up partial file"
-            rm -f "$CACHE_PATH"
+            echo "Download to cache failed or corrupt, cleaning up"
+            rm -f "$CACHE_PATH" "$HASH_CACHE_PATH"
             return 1
           fi
         }
 
         download_to_tmpfs() {
-          local tmpfs_path="/sysroot/store.squashfs"
-          if ${pkgs.wget}/bin/wget -q -O "$tmpfs_path" "$STORE_URL"; then
+          local tmpfs_path="/sysroot/store.squashfs" expected
+          expected=$(fetch_remote_hash)
+          if $WGET -q -O "$tmpfs_path" "$STORE_URL" && verify_squashfs "$tmpfs_path" "$expected"; then
             echo "Download to tmpfs complete, size: $(du -h "$tmpfs_path" | cut -f1)"
             TARGET_SQUASHFS="$tmpfs_path"
             return 0
           else
-            echo "ERROR: Download to tmpfs also failed!"
+            echo "ERROR: Download to tmpfs failed or corrupt!"
             rm -f "$tmpfs_path"
             return 1
           fi
@@ -240,7 +267,7 @@ in
           fi
 
           if [ "$CACHE_AVAILABLE" = "true" ]; then
-            if is_cache_stale "$CACHE_PATH" "$HASH_CACHE_PATH" "$HASH_URL"; then
+            if is_cache_stale "$CACHE_PATH" "$HASH_CACHE_PATH"; then
               echo "Cache is stale or missing, downloading to $CACHE_PATH"
               download_to_cache || download_to_tmpfs
             else

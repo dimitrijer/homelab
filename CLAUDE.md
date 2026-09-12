@@ -40,7 +40,9 @@ The easiest way to build and deploy images is with `build-and-deploy.sh`:
 ./build-and-deploy.sh jellyfin navidrome
 ```
 
-Available images: `adguard-home`, `audiobookshelf`, `calibre-web`, `ganeti-node`, `jellyfin`, `metrics`, `navidrome`, `paperless`.
+Available images: `adguard-home`, `audiobookshelf`, `calibre-web`, `ganeti-node`, `immich`, `jellyfin`, `metrics`, `navidrome`, `paperless`, `uptime-kuma` (the script discovers them from the `imageNames` attribute of `default.nix`).
+
+All requested images are built with a **single** `nix-build` (one evaluation, all builds scheduled together) via `mkDeployFarm`, producing `./result/<image>/bin/deploy`.
 
 For more control, use `nix-build` directly:
 
@@ -55,8 +57,11 @@ nix-build -A ganeti-node.deploy
 # Deploy to boot server (requires SSH key)
 ./result/bin/deploy ~/.ssh/id_ed25519
 
-# Build Ganeti package alone
+# Build Ganeti package alone (runs its Haskell + Python test suites)
 nix-build -A ganeti
+
+# Build all deploy scripts at once (./result/<image>/bin/deploy)
+nix-build -A all -o result
 
 # Build OVN package
 nix-build -A ovn
@@ -125,15 +130,21 @@ Serial console on all physical nodes: `ttyS1` at 19200 baud (Serial over LAN).
 ### The Build Pipeline
 
 1. **Entry Point** (`default.nix`):
-   - Imports `nix/` with system and overlays
-   - Builds custom packages: `ovn`, `ganeti`, `ganeti-os-providers`, `prometheus-ganeti-exporter`
-   - Creates overlays for these packages
-   - Calls `nixos/default.nix` with overlayed pkgs
+   - Imports `nix/` once; that single `pkgs` already contains every custom
+     package (via `nix/overlays/homelab.nix`)
+   - Exposes `ganeti`, `ovn`, `ovn-bgp-agent`, `nomad-bin`, `nomad-driver-virt`,
+     `ganeti-os-pxe`, `prometheus-ganeti-exporter` for standalone builds
+   - Calls `nixos/default.nix` and merges the image classes into the result
+   - `all` / `mkDeployFarm names` build a `linkFarm` of deploy scripts
 
 2. **Overlay System** (`nix/overlays/`):
-   - Base overlays loaded automatically: qemu, ovmf, ghc, drbd
-   - Additional overlays injected at runtime (ganeti, ovn)
-   - Order matters: later overlays can reference earlier ones
+   - `qemu.nix` → `qemu-minimal`, `ovmf.nix` → `OVMF-nosmm`,
+     `drbd.nix` → `drbd-kernel-module` (function of a kernel package set) and
+     `drbd-utils-9`, `homelab.nix` → all repo packages
+   - **Every custom variant is a new attribute.** Stock `qemu`, `qemu-utils`,
+     `OVMF`, `drbd`, `linuxPackages` are never overridden, because Hydra-cached
+     packages depend on them at build time (see "Build Speed" below)
+   - Order matters: `homelab.nix` is last and consumes the others
 
 3. **mkNetbuild Function** (`nixos/default.nix`):
    - Takes `className` and `modules` list
@@ -184,38 +195,46 @@ self: super: {
 ├── ganeti/                     # Ganeti derivation and components
 │   ├── default.nix            # Ganeti 3.x package with custom patches
 │   ├── *.patch                # Compatibility and feature patches
-│   ├── os-providers/          # Ganeti OS providers
+│   ├── os-providers/
 │   │   └── ganeti-os-pxe.nix # PXE boot OS provider
 │   └── prometheus-exporter/   # Ganeti metrics exporter
 ├── ipxe/
 │   └── netboot.ipxe           # Main iPXE boot menu script
-├── netboot.ipxe               # Root iPXE script (symlink or copy)
 ├── nix/
 │   ├── sources.json           # niv-managed dependencies
 │   ├── sources.nix            # niv fetcher implementation
-│   ├── default.nix            # nixpkgs with overlays
-│   └── overlays/              # Custom package overlays
+│   ├── default.nix            # nixpkgs with overlays (+ unfree predicate for nomad)
+│   └── overlays/
 │       ├── default.nix        # Overlay aggregator
-│       ├── qemu.nix           # QEMU with custom iPXE ROM
-│       ├── drbd.nix           # DRBD 9.x kernel module
-│       ├── ovmf.nix           # UEFI firmware
-│       └── ghc.nix            # GHC for Ganeti
+│       ├── qemu.nix           # qemu-minimal (feature-trimmed QEMU)
+│       ├── ovmf.nix           # OVMF-nosmm (Secure Boot UEFI firmware, no SMM)
+│       ├── drbd.nix           # drbd-kernel-module, drbd-utils-9 (DRBD 9.x)
+│       └── homelab.nix        # ganeti, ovn, ovn-bgp-agent, nomad-*, ... in pkgs
 ├── nginx/
 │   └── default.nix            # nginx container for MikroTik router
 ├── nixos/
 │   ├── default.nix            # mkNetbuild function and class definitions
 │   ├── classes/               # NixOS image configurations
 │   │   ├── ganeti-node.nix   # Physical cluster node image
-│   │   ├── navidrome.nix     # Music streaming service
-│   │   ├── calibre-web.nix   # eBook server
-│   │   ├── paperless.nix     # Document management
-│   │   ├── audiobookshelf.nix# Audiobook server
-│   │   └── metrics.nix       # Prometheus/Grafana monitoring
+│   │   ├── adguard-home.nix  # DNS
+│   │   ├── audiobookshelf.nix
+│   │   ├── calibre-web.nix
+│   │   ├── immich.nix        # Photos (PostgreSQL on /var)
+│   │   ├── jellyfin.nix
+│   │   ├── metrics.nix       # Prometheus/Grafana monitoring
+│   │   ├── navidrome.nix
+│   │   ├── paperless.nix
+│   │   └── uptime-kuma.nix
 │   ├── modules/               # Reusable NixOS modules
 │   │   ├── common.nix        # Base configuration for all images
 │   │   ├── common-vm.nix     # Base configuration for VMs
+│   │   ├── netboot-nixpkgs-systemd.nix  # stage-1 squashfs store fetch/mount
 │   │   ├── ganeti.nix        # Ganeti cluster module
 │   │   ├── ovn.nix           # OVN networking module
+│   │   ├── ovn-bgp-agent.nix # BGP advertisement of OVN networks
+│   │   ├── frr.nix           # FRR BGP peering with the router
+│   │   ├── nomad.nix         # Nomad agent + nomad-driver-virt
+│   │   ├── cluster-config.nix# per-node values from hostname (/etc/default/cluster)
 │   │   ├── acme-nginx-reverse-proxy.nix  # ACME + nginx
 │   │   ├── prometheus-ganeti-exporter.nix
 │   │   └── provisioning/
@@ -224,45 +243,49 @@ self: super: {
 │   ├── layouts/
 │   │   └── default.nix       # Disko disk layouts for VMs
 │   └── secrets/
-│       └── secrets.nix       # Agenix secrets configuration
+│       ├── secrets.nix       # Agenix secrets configuration
+│       └── rekey.sh          # Re-encrypt secrets for all host keys
+├── nomad/
+│   ├── default.nix            # nomad-driver-virt (from source)
+│   └── nomad-bin.nix          # Nomad itself, HashiCorp release binary
+├── openstack/                  # OpenStack python libs missing from nixpkgs
 ├── ovn/
-│   └── default.nix            # OVN package with OVS
-└── initrd/
-    └── default.nix            # Custom initrd components
+│   └── default.nix            # OVN package, bundling the OVS it is built against
+└── ovn-bgp-agent/              # ovn-bgp-agent package + patches
 ```
 
 ## Critical Dependencies and Constraints
 
-### Python Version Lock
+### Python Version
 
-Ganeti **requires Python 3.11** because `asyncore` was removed in Python 3.12. This is hardcoded in `ganeti/default.nix`:
-
-```nix
-python311 # asyncore was removed in 3.12
-```
-
-When updating nixpkgs, verify Python 3.11 is still available or Ganeti will fail to build.
+Ganeti builds against the default `python3` (3.14 on the current pin). The
+historical "Python 3.11 because of asyncore" constraint no longer applies:
+Ganeti master dropped asyncore. Python compatibility problems on a nixpkgs
+bump show up in `nix-build -A ganeti` (its test suite always runs).
 
 ### Patch Management
 
-Ganeti has 11 patches in `ganeti/default.nix`:
+Ganeti has 15 patches in `ganeti/default.nix`:
 
 **Upstream patches** (from ganeti-rpm project):
 - `ganeti-2.16.1-fix-new-cluster-node-certificates.patch`
 - `ganeti-3.0.0-qemu-migrate-set-parameters-version-check.patch`
 - `ganeti-3.0.2-kvm-qmp-timeout.patch`
 
-**Nix-specific patches**:
+**Nix / toolchain compatibility patches**:
 - `ganeti-3.0.2-make-daemons-scripts-executable.patch`
 - `ganeti-3.0.2-makefile-am.patch`
 - `ganeti-3.0.2-do-not-link-when-running-ssh-cmds.patch`
 - `ganeti-3.0.2-disable-incompatible-pytests.patch`
-
-**Feature patches**:
 - `ganeti-3.1-bitarray-compat.patch`: Python bitarray API changes
 - `ganeti-3.1-do-not-reset-env-when-updating-master-ip.patch`: Environment handling
 - `ganeti-3.1-pandoc-3.6-man-rst.patch`: Documentation generation
-- **`ganeti-3.1-drbd-compat.patch`**: DRBD 9.x compatibility (CRITICAL)
+- `ganeti-3.1-disable-ssh-sandbox-pytests.patch`
+- `ganeti-3.1-pytest-unit-conftest.patch`
+- `ganeti-3.1-pyopenssl-x509req.patch`
+
+**Feature patches**:
+- **`ganeti-3.1-drbd-compat.patch`**: DRBD 9.x compatibility via the kernel's drbd8 compat mode (CRITICAL)
 - **`ganeti-3.1-ovn.patch`**: OVN networking support (CRITICAL)
 
 When updating Ganeti version:
@@ -273,18 +296,20 @@ When updating Ganeti version:
 ### Dependency Chain
 
 ```
-ganeti <- {ovn, drbd, qemu, OVMF, ghc}
-  ovn <- openvswitch (built from source)
-  drbd <- drbd-utils + kernel module (custom version)
-  qemu <- custom iPXE ROM (pxe-virtio.rom)
-  ghc <- specific Haskell packages for monitoring
+ganeti <- {ovn, drbd-utils-9, qemu-utils (stock), haskellPackages libs (stock, cached),
+           pandoc / cabal-install / hscolour (stock, top-level)}
+  ovn <- OVS submodule (built together, must stay in sync)
+  drbd-utils-9 <- LINBIT drbd-utils git; drbd-kernel-module <- LINBIT drbd git
+ganeti-node image <- {ganeti, qemu-minimal, OVMF-nosmm, drbd-*, nomad-bin,
+                      nomad-driver-virt, ovn-bgp-agent, openstack python libs}
 ```
 
-The overlay order in `nix/overlays/default.nix` matters because:
-1. QEMU must be available for Ganeti
-2. DRBD must be available for Ganeti
-3. OVMF must be available for QEMU
-4. GHC must have monitoring packages for Ganeti Haskell daemons
+Ganeti deliberately does **not** depend on `qemu-minimal` or `OVMF-nosmm`:
+the compiled-in default `kvm_path` is `/run/current-system/sw/bin/qemu-kvm`
+and the firmware is exposed at `/etc/ganeti/ovmf/` (both provided by the
+Ganeti NixOS module via `qemuPackage` / `ovmfPackage`), so changing either
+does not rebuild Ganeti. `ovn` and `drbd-utils-9` are still build inputs (PATH
+of the wrapped daemons), so bumping them does rebuild Ganeti.
 
 ### LVM and DRBD Interaction
 
@@ -332,6 +357,36 @@ When updating nixpkgs:
 3. Test Ganeti build with patches
 4. Test at least one full netboot image build
 
+## Build Speed and Binary Cache Hygiene
+
+Rebuilding `ganeti-node` after a nixpkgs bump should only compile what is
+genuinely custom: ganeti (+ its tests), ovn+ovs, qemu-minimal, OVMF-nosmm, the
+drbd module + utils, nomad-driver-virt, ovn-bgp-agent, the `openstack/` python
+libraries, and the per-image kernel-modules/initrd/squashfs steps. Everything else must come from
+cache.nixos.org. Measure with:
+
+```bash
+nix-build --dry-run -A ganeti-node.netbuild 2>&1 | sed -n '/will be built/,/will be fetched/p'
+```
+
+Rules that keep it that way:
+
+1. **Never override a stock nixpkgs attribute** (`qemu`, `qemu-utils`, `OVMF`,
+   `OVMF-xen`, `drbd`, `linuxPackages`, python packages via
+   `pythonPackagesExtensions`, ...). Hydra-cached packages depend on them at
+   build time and every dependent gets rebuilt locally. Add a new attribute
+   (`qemu-minimal`, `OVMF-nosmm`, `drbd-utils-9`) and reference it explicitly.
+2. **Keep Ganeti on the default `haskellPackages`** and take Haskell *tools*
+   from the top level (`pandoc`, `cabal-install`, `hlint`,
+   `haskellPackages.hscolour`). Only the default GHC's package set is cached;
+   pinning another GHC (as was done with 9.6 until 2026-09) compiles ~90
+   libraries locally, pandoc included.
+3. **Unfree packages are never cached** (nomad is BSL): `nomad-bin` uses the
+   HashiCorp release binary instead of building from source.
+4. Keep Ganeti's build inputs minimal; a QEMU/OVMF change must not rebuild it.
+5. Host `nix.conf`: `cores = 0` so that a single big build (ganeti, qemu, ovn,
+   OVMF) can use all CPUs; `max-jobs = 4` is a reasonable ceiling for 16 GB RAM.
+
 ## Common Modification Patterns
 
 ### Adding a New Service VM
@@ -376,16 +431,8 @@ When updating nixpkgs:
 }
 ```
 
-3. Add to `build-and-deploy.sh` `ALL_IMAGES` array:
-
-```bash
-ALL_IMAGES=(
-    # ... existing images
-    myservice
-)
-```
-
-4. Build and deploy:
+3. Build and deploy (`build-and-deploy.sh` discovers images from
+   `default.nix`; nothing else to register):
 
 ```bash
 ./build-and-deploy.sh myservice
@@ -426,6 +473,9 @@ virtualisation.ganeti = {
   osProviders = [ pkgs.ganeti-os-pxe ];
   rapiUsers = [ {...} ];                # For monitoring
   adminUsers = [ "dimitrije" ];         # gnt-admin group
+  qemuPackage = pkgs.qemu-minimal;      # qemu-kvm in the system profile + libvirtd
+  drbdPackage = pkgs.drbd-utils-9;      # drbdadm/drbdsetup in the system profile
+  ovmfPackage = pkgs.OVMF-nosmm.fd;     # exposed at /etc/ganeti/ovmf/
 };
 ```
 
@@ -433,12 +483,12 @@ Changes require rebuilding and deploying ganeti-node image, then rebooting all p
 
 ### Updating DRBD Version
 
-1. Edit `nix/overlays/drbd.nix`:
-
-```nix
-version = "9.2.XX";  # Update version
-hash = "sha256-...";  # Update hash
-```
+1. Edit `nix/overlays/drbd.nix` (`kernelRev`/`utilsRev`, versions, hashes).
+   The module is `drbd-kernel-module <kernelPackages>` (used from
+   `boot.extraModulePackages` in `ganeti-node.nix`), the userland is
+   `drbd-utils-9`. Do not turn these back into overrides of `drbd` /
+   `linuxPackages`: xen's block scripts substitute `drbdadm`, so overriding
+   `drbd` rebuilds xen, libvirt and libvirt-python.
 
 2. If Ganeti needs changes, update `ganeti/ganeti-3.1-drbd-compat.patch`
 
@@ -456,17 +506,18 @@ nix-build -A ganeti-node.netbuild
 
 ### Adding Custom QEMU Features
 
-Edit `nix/overlays/qemu.nix`:
+Edit `nix/overlays/qemu.nix` (`qemu-minimal`):
 
 ```nix
-super.qemu.override {
+qemu-minimal = super.qemu.override {
   # Add feature flags
   spiceSupport = true;
   # etc.
 }
 ```
 
-The custom iPXE ROM (`pxe-virtio.rom`) must remain in `${out}/share/qemu/` for Ganeti VMs to network boot.
+Keep it a separate attribute: overriding `qemu`/`qemu-utils` rebuilds every
+cached package whose tests use qemu-img (all the OpenStack python libraries).
 
 ### Modifying Disk Layouts
 
@@ -641,7 +692,7 @@ patch -p1 < ~/git/homelab/ganeti/ganeti-3.1-drbd-compat.patch
 **Python dependency issues**:
 ```bash
 # Check available Python packages
-nix-instantiate --eval -E 'with import ./nix {}; python311.pkgs.bitarray.version'
+nix-instantiate --eval -E 'with import ./nix {}; python3.pkgs.bitarray.version'
 
 # Test Python environment
 nix-build -A ganeti.buildInputs
@@ -756,19 +807,23 @@ These are from [LINBIT's DRBD performance testing](https://linbit.com/blog/indep
 | Modify base config | `nixos/modules/common.nix` |
 | Change disk layout | `nixos/layouts/default.nix` |
 | Update dependencies | `niv update` (modifies `nix/sources.json`) |
-| Customize QEMU | `nix/overlays/qemu.nix` |
+| Update Nomad | `nomad/nomad-bin.nix` (version + SHA256 from HashiCorp releases) |
+| Customize QEMU | `nix/overlays/qemu.nix` (`qemu-minimal`) |
+| Customize OVMF | `nix/overlays/ovmf.nix` (`OVMF-nosmm`) |
 | Change boot menu | `ipxe/netboot.ipxe` |
 | Manage secrets | `nixos/secrets/secrets.nix` |
 | Add node to cluster | `nixos/classes/ganeti-node.nix` (nodes attr) |
 
 ### Codebase Metrics
 
-**Total Lines of Nix Code**: ~938 lines across all .nix files
+**Total Lines of Nix Code**: ~5500 lines across all .nix files (plus ~4000
+lines of patches)
 
 **Complexity Distribution**:
 - Simple: Service classes (navidrome, calibre-web) - ~40 lines each
-- Medium: Modules (provisioning, ovn) - ~100-150 lines
-- Complex: ganeti.nix, ganeti-node.nix - ~280-600 lines
+- Medium: Modules (provisioning, ovn, frr, nomad, netboot) - ~100-300 lines
+- Complex: ganeti.nix module, ganeti-node.nix, ganeti/default.nix - ~300-600 lines
+- Bulk: openstack/ (14 python package files), ovn-bgp-agent/ patches
 
 **Key Patterns**:
 1. **Module Pattern**: Options + mkIf config blocks

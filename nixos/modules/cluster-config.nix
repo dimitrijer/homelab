@@ -16,7 +16,7 @@ let
         ${name})
           CLUSTER_HOSTNAME="${node.hostname}"
           CLUSTER_NODE_ADDRESS="${node.address}"
-          CLUSTER_NODE_SECONDARY_ADDRESS="${node.secondaryAddress}"
+          CLUSTER_NODE_SECONDARY_ADDRESS="${toString node.secondaryAddress}"
           ;;
       '') config.virtualisation.ganeti.nodes)}
       *)

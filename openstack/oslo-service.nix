@@ -22,6 +22,14 @@
 , futurist
 }:
 
+let
+  # nixpkgs marks paste as broken because setuptools >= 82 removed
+  # pkg_resources.
+  paste' = paste.overridePythonAttrs (old: {
+    doCheck = false;
+    meta = (old.meta or { }) // { broken = false; };
+  });
+in
 buildPythonPackage rec {
   pname = "oslo.service";
   version = "4.3.0";
@@ -49,7 +57,7 @@ buildPythonPackage rec {
     oslo-i18n
     oslo-log
     oslo-utils
-    paste
+    paste'
     pastedeploy
     routes
     webob

@@ -4,10 +4,11 @@
 , system ? "x86_64-linux"
 }:
 
-let
-  finalOverlays = import ./overlays { inherit overlays; };
-in
 import sources.nixpkgs {
-  inherit config system;
-  overlays = finalOverlays;
+  inherit system;
+  config = {
+    # Nomad is licensed under BSL.
+    allowUnfreePredicate = pkg: builtins.elem (pkg.pname or "") [ "nomad" ];
+  } // config;
+  overlays = import ./overlays { inherit overlays; };
 }
