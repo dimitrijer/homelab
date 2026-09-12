@@ -386,6 +386,17 @@ Rules that keep it that way:
 4. Keep Ganeti's build inputs minimal; a QEMU/OVMF change must not rebuild it.
 5. Host `nix.conf`: `cores = 0` so that a single big build (ganeti, qemu, ovn,
    OVMF) can use all CPUs; `max-jobs = 4` is a reasonable ceiling for 16 GB RAM.
+6. **A build that "hangs" is usually a package missing from cache.nixos.org**
+   (Hydra failed it for this pin), being built locally with a huge test
+   suite. Find it with `find /nix/var/log/nix/drvs -mmin -60 -type f` (newest
+   log = the running build) or the dry run above, confirm with
+   `nix path-info --store https://cache.nixos.org <output path>`. Usually the
+   right fix is bumping nixpkgs (Hydra has typically fixed it by then); if
+   not, skip that package's tests with a scoped
+   `overridePythonAttrs`/`overrideAttrs` on the consuming package, e.g.
+   `services.paperless.package = pkgs.paperless-ngx.override { python3Packages = pkgs.python3Packages.overrideScope (...); }`.
+   Remove the override again once the package is back in the cache, otherwise
+   it keeps forcing a local build.
 
 ## Common Modification Patterns
 
