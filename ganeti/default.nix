@@ -94,7 +94,7 @@ let
       test-framework-quickcheck2
     ]);
 
-  ganetiRev = "274c9fe45aec59bd7d98957afb6800d2bd7066af";
+  ganetiRev = "8f9c76c0ec097282c49f5fd8c02a863fdf6a9301";
 
   # Programs the Ganeti daemons, CLI and tools invoke at runtime. They are also
   # build inputs because ./configure looks some of them up (ip, socat, qemu-img)
@@ -125,7 +125,7 @@ rec {
   src = fetchgit {
     url = "https://github.com/ganeti/ganeti.git";
     rev = ganetiRev;
-    hash = "sha256-KDawW8bs5DvAejUl2Mu0SetEZ5hPZU0smQX9jpgo3ZI=";
+    hash = "sha256-IJuWib/Bk/l8ixK+TC526htyPVrALc+eCNNvvV15Y2w=";
   };
 
   nativeBuildInputs = [
