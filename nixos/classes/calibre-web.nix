@@ -36,6 +36,11 @@ in
     };
   };
 
+  # Calibre's conversion worker lowers its own priority with os.nice(), which
+  # the upstream module's "~@resources" filter forbids (worker dies with
+  # SIGSYS). Remove setpriority from the deny list again.
+  systemd.services.calibre-web.serviceConfig.SystemCallFilter = [ "setpriority" ];
+
   services.acme-nginx-reverse-proxy = {
     enable = true;
     domain = "calibre.homelab.tel";
