@@ -24,11 +24,4 @@ self: super: {
   ganeti-os-pxe = self.callPackage ../../ganeti/os-providers/ganeti-os-pxe.nix { };
 
   prometheus-ganeti-exporter = self.callPackage ../../ganeti/prometheus-exporter { };
-
-  nomad-driver-virt = self.callPackage ../../nomad { };
-
-  # HashiCorp's release binary. nixpkgs' nomad is BSL-licensed and therefore
-  # never built by Hydra; building it from source costs a full Go build on
-  # every nixpkgs bump.
-  nomad-bin = self.callPackage ../../nomad/nomad-bin.nix { };
 }

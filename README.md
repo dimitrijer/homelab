@@ -39,8 +39,7 @@ using files in this repo.
   Each class represents a different image. Right now there are:
   - `ganeti-node` that nodes in the cluster boot from; this is the only image
     that physical boxes use. Besides Ganeti it runs OVN, FRR (BGP peering with
-    the router), ovn-bgp-agent and a Nomad agent with
-    [nomad-driver-virt](https://github.com/dimitrijer/nomad-driver-virt).
+    the router) and ovn-bgp-agent.
   - `navidrome`
   - `calibre-web` for [Calibre web server](https://github.com/janeczku/calibre-web)
   - `jellyfin`

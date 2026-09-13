@@ -6,9 +6,6 @@
 
 import sources.nixpkgs {
   inherit system;
-  config = {
-    # Nomad is licensed under BSL.
-    allowUnfreePredicate = pkg: builtins.elem (pkg.pname or "") [ "nomad" ];
-  } // config;
+  inherit config;
   overlays = import ./overlays { inherit overlays; };
 }

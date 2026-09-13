@@ -84,15 +84,11 @@ in
     osProviders = mkOption {
       type = types.listOf types.package;
     };
-    libvirtEnabled = mkOption {
-      type = types.bool;
-      default = false;
-    };
     qemuPackage = mkOption {
       type = types.package;
       default = pkgs.qemu_kvm;
       defaultText = literalExpression "pkgs.qemu_kvm";
-      description = "QEMU used for instances (provides qemu-kvm in the system profile; also handed to libvirtd)";
+      description = "QEMU used for instances (provides qemu-kvm in the system profile)";
     };
     drbdPackage = mkOption {
       type = types.package;
@@ -220,18 +216,6 @@ in
       users.users.root.openssh.authorizedKeys.keys = lib.attrsets.mapAttrsToList
         (name: node: node.rootPubkey)
         cfg.nodes;
-
-      virtualisation.libvirtd = mkIf cfg.libvirtEnabled {
-        enable = true;
-        qemu = {
-          package = cfg.qemuPackage;
-          runAsRoot = true;
-          swtpm.enable = true;
-        };
-      };
-      systemd.sockets = mkIf cfg.libvirtEnabled {
-        "libvirtd-tcp".wantedBy = [ "ganeti-noded.service" ];
-      };
 
       environment.systemPackages =
         let

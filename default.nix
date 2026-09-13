@@ -23,8 +23,6 @@ in
     ovn-bgp-agent
     ganeti
     ganeti-os-pxe
-    nomad-driver-virt
-    nomad-bin
     prometheus-ganeti-exporter;
 
   nginx = import ./nginx/default.nix { pkgs = pkgs.pkgsCross.aarch64-multiplatform; };

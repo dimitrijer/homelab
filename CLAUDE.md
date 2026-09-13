@@ -132,8 +132,8 @@ Serial console on all physical nodes: `ttyS1` at 19200 baud (Serial over LAN).
 1. **Entry Point** (`default.nix`):
    - Imports `nix/` once; that single `pkgs` already contains every custom
      package (via `nix/overlays/homelab.nix`)
-   - Exposes `ganeti`, `ovn`, `ovn-bgp-agent`, `nomad-bin`, `nomad-driver-virt`,
-     `ganeti-os-pxe`, `prometheus-ganeti-exporter` for standalone builds
+   - Exposes `ganeti`, `ovn`, `ovn-bgp-agent`, `ganeti-os-pxe`,
+     `prometheus-ganeti-exporter` for standalone builds
    - Calls `nixos/default.nix` and merges the image classes into the result
    - `all` / `mkDeployFarm names` build a `linkFarm` of deploy scripts
 
@@ -203,13 +203,13 @@ self: super: {
 ├── nix/
 │   ├── sources.json           # niv-managed dependencies
 │   ├── sources.nix            # niv fetcher implementation
-│   ├── default.nix            # nixpkgs with overlays (+ unfree predicate for nomad)
+│   ├── default.nix            # nixpkgs with overlays
 │   └── overlays/
 │       ├── default.nix        # Overlay aggregator
 │       ├── qemu.nix           # qemu-minimal (feature-trimmed QEMU)
 │       ├── ovmf.nix           # OVMF-nosmm (Secure Boot UEFI firmware, no SMM)
 │       ├── drbd.nix           # drbd-kernel-module, drbd-utils-9 (DRBD 9.x)
-│       └── homelab.nix        # ganeti, ovn, ovn-bgp-agent, nomad-*, ... in pkgs
+│       └── homelab.nix        # ganeti, ovn, ovn-bgp-agent, ... in pkgs
 ├── nginx/
 │   └── default.nix            # nginx container for MikroTik router
 ├── nixos/
@@ -233,7 +233,6 @@ self: super: {
 │   │   ├── ovn.nix           # OVN networking module
 │   │   ├── ovn-bgp-agent.nix # BGP advertisement of OVN networks
 │   │   ├── frr.nix           # FRR BGP peering with the router
-│   │   ├── nomad.nix         # Nomad agent + nomad-driver-virt
 │   │   ├── cluster-config.nix# per-node values from hostname (/etc/default/cluster)
 │   │   ├── acme-nginx-reverse-proxy.nix  # ACME + nginx
 │   │   ├── prometheus-ganeti-exporter.nix
@@ -245,9 +244,6 @@ self: super: {
 │   └── secrets/
 │       ├── secrets.nix       # Agenix secrets configuration
 │       └── rekey.sh          # Re-encrypt secrets for all host keys
-├── nomad/
-│   ├── default.nix            # nomad-driver-virt (from source)
-│   └── nomad-bin.nix          # Nomad itself, HashiCorp release binary
 ├── openstack/                  # OpenStack python libs missing from nixpkgs
 ├── ovn/
 │   └── default.nix            # OVN package, bundling the OVS it is built against
@@ -300,8 +296,8 @@ ganeti <- {ovn, drbd-utils-9, qemu-utils (stock), haskellPackages libs (stock, c
            pandoc / cabal-install / hscolour (stock, top-level)}
   ovn <- OVS submodule (built together, must stay in sync)
   drbd-utils-9 <- LINBIT drbd-utils git; drbd-kernel-module <- LINBIT drbd git
-ganeti-node image <- {ganeti, qemu-minimal, OVMF-nosmm, drbd-*, nomad-bin,
-                      nomad-driver-virt, ovn-bgp-agent, openstack python libs}
+ganeti-node image <- {ganeti, qemu-minimal, OVMF-nosmm, drbd-*, ovn-bgp-agent,
+                      openstack python libs}
 ```
 
 Ganeti deliberately does **not** depend on `qemu-minimal` or `OVMF-nosmm`:
@@ -361,7 +357,7 @@ When updating nixpkgs:
 
 Rebuilding `ganeti-node` after a nixpkgs bump should only compile what is
 genuinely custom: ganeti (+ its tests), ovn+ovs, qemu-minimal, OVMF-nosmm, the
-drbd module + utils, nomad-driver-virt, ovn-bgp-agent, the `openstack/` python
+drbd module + utils, ovn-bgp-agent, the `openstack/` python
 libraries, and the per-image kernel-modules/initrd/squashfs steps. Everything else must come from
 cache.nixos.org. Measure with:
 
@@ -381,8 +377,8 @@ Rules that keep it that way:
    `haskellPackages.hscolour`). Only the default GHC's package set is cached;
    pinning another GHC (as was done with 9.6 until 2026-09) compiles ~90
    libraries locally, pandoc included.
-3. **Unfree packages are never cached** (nomad is BSL): `nomad-bin` uses the
-   HashiCorp release binary instead of building from source.
+3. **Unfree packages are never cached**: prefer an upstream release binary
+   over building from source (as was done for Nomad while it was in use).
 4. Keep Ganeti's build inputs minimal; a QEMU/OVMF change must not rebuild it.
 5. Host `nix.conf`: `cores = 0` so that a single big build (ganeti, qemu, ovn,
    OVMF) can use all CPUs; `max-jobs = 4` is a reasonable ceiling for 16 GB RAM.
@@ -484,7 +480,7 @@ virtualisation.ganeti = {
   osProviders = [ pkgs.ganeti-os-pxe ];
   rapiUsers = [ {...} ];                # For monitoring
   adminUsers = [ "dimitrije" ];         # gnt-admin group
-  qemuPackage = pkgs.qemu-minimal;      # qemu-kvm in the system profile + libvirtd
+  qemuPackage = pkgs.qemu-minimal;      # qemu-kvm in the system profile
   drbdPackage = pkgs.drbd-utils-9;      # drbdadm/drbdsetup in the system profile
   ovmfPackage = pkgs.OVMF-nosmm.fd;     # exposed at /etc/ganeti/ovmf/
 };
@@ -818,7 +814,6 @@ These are from [LINBIT's DRBD performance testing](https://linbit.com/blog/indep
 | Modify base config | `nixos/modules/common.nix` |
 | Change disk layout | `nixos/layouts/default.nix` |
 | Update dependencies | `niv update` (modifies `nix/sources.json`) |
-| Update Nomad | `nomad/nomad-bin.nix` (version + SHA256 from HashiCorp releases) |
 | Customize QEMU | `nix/overlays/qemu.nix` (`qemu-minimal`) |
 | Customize OVMF | `nix/overlays/ovmf.nix` (`OVMF-nosmm`) |
 | Change boot menu | `ipxe/netboot.ipxe` |
@@ -832,7 +827,7 @@ lines of patches)
 
 **Complexity Distribution**:
 - Simple: Service classes (navidrome, calibre-web) - ~40 lines each
-- Medium: Modules (provisioning, ovn, frr, nomad, netboot) - ~100-300 lines
+- Medium: Modules (provisioning, ovn, frr, netboot) - ~100-300 lines
 - Complex: ganeti.nix module, ganeti-node.nix, ganeti/default.nix - ~300-600 lines
 - Bulk: openstack/ (14 python package files), ovn-bgp-agent/ patches
 

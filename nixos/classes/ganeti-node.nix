@@ -34,7 +34,6 @@ in
     ../modules/frr.nix
     ../modules/prometheus-ganeti-exporter.nix
     ../modules/ovn-bgp-agent.nix
-    ../modules/nomad.nix
   ];
 
   config =
@@ -136,18 +135,6 @@ in
           };
       };
       systemd.services.ovn-northd.unitConfig.ConditionHost = "dalet";
-
-      services.nomad = {
-        enable = true;
-        package = pkgs.nomad-bin;
-        driverVirtPackage = pkgs.nomad-driver-virt;
-        openFirewall = true;
-        bootstrapExpect = 3;
-        datacenter = "dc1";
-        region = "homelab.tel";
-        ovnNBConnection = "tcp:10.1.100.5:6641";
-        nfsImageStore = "192.168.87.1:usb1-part2/disks";
-      };
 
       services.prometheus.exporters.ganeti = {
         enable = true;
