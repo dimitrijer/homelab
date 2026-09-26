@@ -211,7 +211,9 @@ in
         };
       };
       services.openssh = {
-        settings.PermitRootLogin = "yes";
+        # Ganeti needs root SSH between nodes, but only with keys. Password
+        # login for root stays possible on the local/serial console.
+        settings.PermitRootLogin = "prohibit-password";
       };
 
       provisioning.keys.enable = true;
