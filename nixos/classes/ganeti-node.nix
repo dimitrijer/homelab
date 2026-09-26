@@ -7,6 +7,8 @@ let
   nvmeDevice = "/dev/nvme0n1";
   vgGaneti = "pool_gnt";
   vgHost = "pool_host";
+  # dalet runs ovn-northd and the OVN NB/SB databases.
+  daletAddress = "10.1.100.5";
   # `password` is the plaintext the exporter sends via HTTP Basic auth;
   # `passwordHash` is the HA1 digest stored in the RAPI users file (written as
   # {HA1}<passwordHash>). They must correspond:
@@ -73,7 +75,7 @@ in
           };
           dalet = {
             hostname = "dalet";
-            address = "10.1.100.5";
+            address = daletAddress;
             secondaryAddress = "10.1.97.5";
             rootPubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE7Fz1SlS9668sMah8PLib8FDGn82jT7ZAZ8CE1o8uYE root@dalet";
             hostPubkey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDZIULso5QcqBb+4e/T5b/QDrE+nsbXSXWEgFFs/V+NjQK9lmDff/jBMkjuTWJVa2FQf8yOO1B6H+KbCKpDIrBlmJRhgKa1WNzfW33l8RRlFw7MRCx+uUdPBNW1IYhLbGyACbIAJIN5s0F809eVOCEvxhchU14NtRde/n2rMOVDhgxnUgU1DEOw7yh2lyqqPK0076bOYpAgEkPKnwI3Nvnxk8uECeRA7oQrUPtkayNdTvvRJSm9EDDi51aSjJc58GJizpAFyF7ahvXe8v7GO8mGls8k1euIykOIrGqjKh7OGZQWQCL1YLaMiBKyEtxBFb5eMa/ZAWAArW7YOuUHsIFjs8K6dzUKRe4pKg43TjWOPPUaTQzmlprcprAlNFuC1E9bVscYMd3OxBV9AGKVgbqihcgljogxQXVI5H4aTZPF7f5n7/JGdw6JilK1RH5zKYr7F8VBRMstdF8F4Q0XM+cl7VArdCHAInpdrpt5cMGFVz/MAZIaXuUOpoUMB1xR4tE= root@dalet";
@@ -130,8 +132,8 @@ in
               use_stderr = false;
             };
             ovn = {
-              ovn_nb_connection = "tcp:10.1.100.5:6641";
-              ovn_sb_connection = "tcp:10.1.100.5:6642";
+              ovn_nb_connection = "tcp:${daletAddress}:6641";
+              ovn_sb_connection = "tcp:${daletAddress}:6642";
             };
             agent.root_helper = "";
           };
@@ -146,7 +148,7 @@ in
         bootstrapExpect = 3;
         datacenter = "dc1";
         region = "homelab.tel";
-        ovnNBConnection = "tcp:10.1.100.5:6641";
+        ovnNBConnection = "tcp:${daletAddress}:6641";
         nfsImageStore = "192.168.87.1:usb1-part2/disks";
       };
 

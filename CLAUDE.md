@@ -352,12 +352,16 @@ Current pinned dependencies (`nix/sources.json`):
 - **nixpkgs**: nixpkgs-unstable (for latest QEMU, DRBD)
 - **disko**: Disk partitioning (nix-community)
 - **agenix**: Custom fork `dimitrijer/agenix-as-oneshot-service` for oneshot secret provisioning
-- **nixfiles**: Personal nixfiles reference
 
 When updating nixpkgs:
-1. Check Python 3.11 availability
-2. Verify DRBD version compatibility (9.2.x)
-3. Test Ganeti build with patches
+1. Build Ganeti (`nix-build -A ganeti`): its test suite always runs, so this
+   catches Python/Haskell incompatibilities as well as patches that no longer
+   apply
+2. Build the DRBD kernel module (pinned separately in `nix/overlays/drbd.nix`)
+   against the new kernel:
+   `nix-build -E 'with import ./nix { }; drbd-kernel-module linuxPackages'`
+3. Check the dry run for packages unexpectedly built locally (see "Build Speed
+   and Binary Cache Hygiene" below)
 4. Test at least one full netboot image build
 
 ## Build Speed and Binary Cache Hygiene
