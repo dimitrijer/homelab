@@ -268,7 +268,7 @@ bump show up in `nix-build -A ganeti` (its test suite always runs).
 
 ### Patch Management
 
-Ganeti has 15 patches in `ganeti/default.nix`:
+Ganeti has 14 patches in `ganeti/default.nix`:
 
 **Upstream patches** (from ganeti-rpm project):
 - `ganeti-2.16.1-fix-new-cluster-node-certificates.patch`
@@ -285,7 +285,6 @@ Ganeti has 15 patches in `ganeti/default.nix`:
 - `ganeti-3.1-pandoc-3.6-man-rst.patch`: Documentation generation
 - `ganeti-3.1-disable-ssh-sandbox-pytests.patch`
 - `ganeti-3.1-pytest-unit-conftest.patch`
-- `ganeti-3.1-pyopenssl-x509req.patch`
 
 **Feature patches**:
 - **`ganeti-3.1-drbd-compat.patch`**: DRBD 9.x compatibility via the kernel's drbd8 compat mode (CRITICAL)
