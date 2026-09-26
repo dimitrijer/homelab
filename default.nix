@@ -23,6 +23,7 @@ in
     ovn-bgp-agent
     ganeti
     ganeti-os-pxe
+    drbd-reactor
     prometheus-ganeti-exporter;
 
   nginx = import ./nginx/default.nix { pkgs = pkgs.pkgsCross.aarch64-multiplatform; };

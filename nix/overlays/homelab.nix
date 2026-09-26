@@ -24,4 +24,6 @@ self: super: {
   ganeti-os-pxe = self.callPackage ../../ganeti/os-providers/ganeti-os-pxe.nix { };
 
   prometheus-ganeti-exporter = self.callPackage ../../ganeti/prometheus-exporter { };
+
+  drbd-reactor = self.callPackage ../../drbd-reactor { };
 }

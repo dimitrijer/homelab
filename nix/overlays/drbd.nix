@@ -1,18 +1,18 @@
 # DRBD 9.x kernel module and matching drbd-utils.
 self: super:
 let
-  kernelRev = "97da76040a6b31aaf9e12f1a167e77ca2b3cb43e";
-  utilsRev = "13c39bae4d340ed177e4abe5793b80478f6ad8cb";
+  kernelRev = "007df0ec43a02d8e025f5fc87519b46bb720e7c1";
+  utilsRev = "e06af0ef747cf8e1745c27c1ef29bdcf3b9debef";
 in
 {
   # Kernel module, built for whatever kernel package set the image uses:
   #   boot.extraModulePackages = [ (pkgs.drbd-kernel-module config.boot.kernelPackages) ];
   drbd-kernel-module = kernelPackages: kernelPackages.drbd.overrideAttrs (oldAttrs: {
-    version = "9.3.3";
+    version = "9.3.4-unstable-2026-09-24";
     src = super.fetchgit {
       url = "https://github.com/LINBIT/drbd.git";
       rev = kernelRev;
-      hash = "sha256-COdio4Zh4SrPq5c0umg0shPlbfEZmO66rvrxaf3Hf5g=";
+      hash = "sha256-s9vSD5Wb/mkoHCrWqXJ+ivWbtdWMtq2KOGagDAWPb8Q=";
     };
     patches = (oldAttrs.patches or [ ]) ++ [
       # In drbd8 compat mode, forget the address-derived node id when
@@ -33,11 +33,11 @@ in
 
   # Userland (drbdadm, drbdsetup, drbdmeta).
   drbd-utils-9 = super.drbd.overrideAttrs (oldAttrs: {
-    version = "9.34.0";
+    version = "9.35.0-rc.1";
     src = super.fetchgit {
       url = "https://github.com/LINBIT/drbd-utils.git";
       rev = utilsRev;
-      hash = "sha256-g+HmOEVRO3CrmTqn7/bBUen2B92tAtTY0HY6AezkcYc=";
+      hash = "sha256-WzncRCcBbKsJL9JO9rDt5VLW/c9fmxacVgbJgHjMHWw=";
       fetchSubmodules = true;
     };
     nativeBuildInputs = oldAttrs.nativeBuildInputs ++ (with super; [ autoconf automake git ]);

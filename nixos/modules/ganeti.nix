@@ -113,6 +113,22 @@ in
         name = "os-providers";
         paths = cfg.osProviders;
       };
+
+      # Periodic job from doc/examples/ganeti.cron. Skipped on nodes that are
+      # not (yet) part of a cluster, as ganeti-cleaner itself does.
+      mkPeriodic = { description, user, program, args, startAt }: {
+        inherit description startAt;
+        documentation = [ "man:${program}(8)" ];
+        after = [ "ganeti-common.service" ];
+        unitConfig = {
+          ConditionPathExists = [ "/var/lib/ganeti/ssconf_master_node" ];
+        };
+        serviceConfig = {
+          Type = "oneshot";
+          User = user;
+          ExecStart = concatStringsSep " " ([ "${pkgs.ganeti.out}/sbin/${program}" ] ++ args);
+        };
+      };
     in
     mkIf cfg.enable {
       virtualisation.vswitch.enable = true;
@@ -207,7 +223,9 @@ in
         };
       };
       services.openssh = {
-        settings.PermitRootLogin = "yes";
+        # Ganeti needs root SSH between nodes, but only with keys. Password
+        # login for root stays possible on the local/serial console.
+        settings.PermitRootLogin = "prohibit-password";
       };
 
       provisioning.keys.enable = true;
@@ -362,7 +380,11 @@ in
             description = "Ganeti virtualization cluster manager";
             documentation = [ "man:ganeti(7)" ];
             partOf = [ "ganeti.service" ];
-            wantedBy = lib.mkForce [ ]; # loaded on request
+            # Start the node and master daemons at boot, as upstream's
+            # ganeti.target does. Each daemon has a ConditionPathExists on its
+            # config/certificate, so on a node that is not part of a cluster
+            # yet only the ones that need no cluster state start.
+            wantedBy = [ "multi-user.target" ];
           };
           "ganeti-node" = {
             description = "Ganeti node functionality";
@@ -408,6 +430,9 @@ in
         "ganeti-luxid" = {
           description = "Ganeti query daemon (luxid)";
           documentation = [ "man:ganeti-luxid(8)" ];
+          # Job processes are spawned by luxid and inherit its environment;
+          # cluster verify runs `hcheck` (htools) from PATH for its N+1 check.
+          path = [ pkgs.ganeti ];
           requires = [ "ganeti-common.service" ];
           after = [ "ganeti-common.service" ];
           partOf = [ "ganeti-master.target" ];
@@ -569,6 +594,43 @@ in
             # Important: do not kill any KVM processes
             KillMode = "process";
           };
+        };
+
+        # The watcher restarts instances that should be running, re-activates
+        # their disks (e.g. reconnects DRBD after a node reboot) and makes sure
+        # the Ganeti daemons are running. Strict mode (strict disk
+        # verification) every 30 minutes, non-strict mode every 5 minutes in
+        # between. Pause it with `gnt-cluster watcher pause <duration>`.
+        "ganeti-watcher" = mkPeriodic {
+          description = "Ganeti watcher (strict)";
+          user = "root";
+          program = "ganeti-watcher";
+          args = [ ];
+          startAt = "*:00,30";
+        };
+        "ganeti-watcher-no-strict" = mkPeriodic {
+          description = "Ganeti watcher (non-strict)";
+          user = "root";
+          program = "ganeti-watcher";
+          args = [ "--no-strict" ];
+          startAt = "*:05,10,15,20,25,35,40,45,50,55";
+        };
+
+        # Prunes archived jobs older than 21 days.
+        "ganeti-cleaner-master" = mkPeriodic {
+          description = "Ganeti cleaner (master)";
+          user = "gnt-masterd";
+          program = "ganeti-cleaner";
+          args = [ "master" ];
+          startAt = "*-*-* 01:45:00";
+        };
+        # Removes expired import/export certificates and old watcher state.
+        "ganeti-cleaner-node" = mkPeriodic {
+          description = "Ganeti cleaner (node)";
+          user = "root";
+          program = "ganeti-cleaner";
+          args = [ "node" ];
+          startAt = "*-*-* 02:45:00";
         };
       };
     };

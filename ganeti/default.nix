@@ -39,7 +39,8 @@ let
   pythonWithPackages =
     python3.withPackages
       (ps: with ps; [
-        pyopenssl
+        pyopenssl # SSL/TLS connection layer
+        cryptography # certificates and keys
         simplejson
         pyparsing
         pyinotify
@@ -93,7 +94,7 @@ let
       test-framework-quickcheck2
     ]);
 
-  ganetiRev = "8f9c76c0ec097282c49f5fd8c02a863fdf6a9301";
+  ganetiRev = "d3ec9a274041b6ecfdfc4b02eb48e03eb1828b43";
 
   # Programs the Ganeti daemons, CLI and tools invoke at runtime. They are also
   # build inputs because ./configure looks some of them up (ip, socat, qemu-img)
@@ -120,11 +121,11 @@ in
 stdenv.mkDerivation
 rec {
   pname = "ganeti";
-  version = "unstable-2026-05-16";
+  version = "unstable-2026-09-25";
   src = fetchgit {
     url = "https://github.com/ganeti/ganeti.git";
     rev = ganetiRev;
-    hash = "sha256-IJuWib/Bk/l8ixK+TC526htyPVrALc+eCNNvvV15Y2w=";
+    hash = "sha256-TM75BpyJjYdOaGQ1Hm6iBsyQ1GLgG+mDX5SA9eXdoQs=";
   };
 
   nativeBuildInputs = [
@@ -168,7 +169,6 @@ rec {
     ./ganeti-3.1-pandoc-3.6-man-rst.patch
     ./ganeti-3.1-disable-ssh-sandbox-pytests.patch
     ./ganeti-3.1-pytest-unit-conftest.patch
-    ./ganeti-3.1-pyopenssl-x509req.patch
 
     # additional features
     # - DRBD9 compatibility (via the kernel's drbd8 compat mode)

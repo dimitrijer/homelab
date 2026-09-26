@@ -42,7 +42,7 @@ The easiest way to build and deploy images is with `build-and-deploy.sh`:
 
 Available images: `adguard-home`, `audiobookshelf`, `calibre-web`, `ganeti-node`, `immich`, `jellyfin`, `metrics`, `navidrome`, `paperless`, `uptime-kuma` (the script discovers them from the `imageNames` attribute of `default.nix`).
 
-All requested images are built with a **single** `nix-build` (one evaluation, all builds scheduled together) via `mkDeployFarm`, producing `./result/<image>/bin/deploy`.
+Images are built and deployed one at a time (`nix-build -A <image>.deploy`). If one fails to build or deploy, the script moves on to the next and exits non-zero at the end with a list of the images that failed.
 
 For more control, use `nix-build` directly:
 
@@ -233,6 +233,7 @@ self: super: {
 │   │   ├── ovn.nix           # OVN networking module
 │   │   ├── ovn-bgp-agent.nix # BGP advertisement of OVN networks
 │   │   ├── frr.nix           # FRR BGP peering with the router
+│   │   ├── drbd-reactor.nix  # drbd-reactor (DRBD Prometheus exporter)
 │   │   ├── cluster-config.nix# per-node values from hostname (/etc/default/cluster)
 │   │   ├── acme-nginx-reverse-proxy.nix  # ACME + nginx
 │   │   ├── prometheus-ganeti-exporter.nix
@@ -244,6 +245,8 @@ self: super: {
 │   └── secrets/
 │       ├── secrets.nix       # Agenix secrets configuration
 │       └── rekey.sh          # Re-encrypt secrets for all host keys
+├── drbd-reactor/
+│   └── default.nix            # drbd-reactor (LINBIT, Rust), not in nixpkgs
 ├── openstack/                  # OpenStack python libs missing from nixpkgs
 ├── ovn/
 │   └── default.nix            # OVN package, bundling the OVS it is built against
@@ -261,7 +264,7 @@ bump show up in `nix-build -A ganeti` (its test suite always runs).
 
 ### Patch Management
 
-Ganeti has 15 patches in `ganeti/default.nix`:
+Ganeti has 14 patches in `ganeti/default.nix`:
 
 **Upstream patches** (from ganeti-rpm project):
 - `ganeti-2.16.1-fix-new-cluster-node-certificates.patch`
@@ -278,7 +281,6 @@ Ganeti has 15 patches in `ganeti/default.nix`:
 - `ganeti-3.1-pandoc-3.6-man-rst.patch`: Documentation generation
 - `ganeti-3.1-disable-ssh-sandbox-pytests.patch`
 - `ganeti-3.1-pytest-unit-conftest.patch`
-- `ganeti-3.1-pyopenssl-x509req.patch`
 
 **Feature patches**:
 - **`ganeti-3.1-drbd-compat.patch`**: DRBD 9.x compatibility via the kernel's drbd8 compat mode (CRITICAL)
@@ -345,19 +347,23 @@ Current pinned dependencies (`nix/sources.json`):
 - **nixpkgs**: nixpkgs-unstable (for latest QEMU, DRBD)
 - **disko**: Disk partitioning (nix-community)
 - **agenix**: Custom fork `dimitrijer/agenix-as-oneshot-service` for oneshot secret provisioning
-- **nixfiles**: Personal nixfiles reference
 
 When updating nixpkgs:
-1. Check Python 3.11 availability
-2. Verify DRBD version compatibility (9.2.x)
-3. Test Ganeti build with patches
+1. Build Ganeti (`nix-build -A ganeti`): its test suite always runs, so this
+   catches Python/Haskell incompatibilities as well as patches that no longer
+   apply
+2. Build the DRBD kernel module (pinned separately in `nix/overlays/drbd.nix`)
+   against the new kernel:
+   `nix-build -E 'with import ./nix { }; drbd-kernel-module linuxPackages'`
+3. Check the dry run for packages unexpectedly built locally (see "Build Speed
+   and Binary Cache Hygiene" below)
 4. Test at least one full netboot image build
 
 ## Build Speed and Binary Cache Hygiene
 
 Rebuilding `ganeti-node` after a nixpkgs bump should only compile what is
 genuinely custom: ganeti (+ its tests), ovn+ovs, qemu-minimal, OVMF-nosmm, the
-drbd module + utils, ovn-bgp-agent, the `openstack/` python
+drbd module + utils, drbd-reactor, ovn-bgp-agent, the `openstack/` python
 libraries, and the per-image kernel-modules/initrd/squashfs steps. Everything else must come from
 cache.nixos.org. Measure with:
 
