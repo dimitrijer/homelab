@@ -46,6 +46,13 @@ in
         }];
       }
       {
+        job_name = "drbd";
+        scrape_interval = "15s";
+        static_configs = [{
+          targets = map (node: "${node}.homelab.tel:9942") [ "aleph" "bet" "gimel" "dalet" ];
+        }];
+      }
+      {
         job_name = "ganeti";
         scrape_interval = "15s";
         static_configs = [{

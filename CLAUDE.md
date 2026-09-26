@@ -234,6 +234,7 @@ self: super: {
 │   │   ├── ovn-bgp-agent.nix # BGP advertisement of OVN networks
 │   │   ├── frr.nix           # FRR BGP peering with the router
 │   │   ├── nomad.nix         # Nomad agent + nomad-driver-virt
+│   │   ├── drbd-reactor.nix  # drbd-reactor (DRBD Prometheus exporter)
 │   │   ├── cluster-config.nix# per-node values from hostname (/etc/default/cluster)
 │   │   ├── acme-nginx-reverse-proxy.nix  # ACME + nginx
 │   │   ├── prometheus-ganeti-exporter.nix
@@ -245,6 +246,8 @@ self: super: {
 │   └── secrets/
 │       ├── secrets.nix       # Agenix secrets configuration
 │       └── rekey.sh          # Re-encrypt secrets for all host keys
+├── drbd-reactor/
+│   └── default.nix            # drbd-reactor (LINBIT, Rust), not in nixpkgs
 ├── nomad/
 │   ├── default.nix            # nomad-driver-virt (from source)
 │   └── nomad-bin.nix          # Nomad itself, HashiCorp release binary
@@ -361,7 +364,7 @@ When updating nixpkgs:
 
 Rebuilding `ganeti-node` after a nixpkgs bump should only compile what is
 genuinely custom: ganeti (+ its tests), ovn+ovs, qemu-minimal, OVMF-nosmm, the
-drbd module + utils, nomad-driver-virt, ovn-bgp-agent, the `openstack/` python
+drbd module + utils, drbd-reactor, nomad-driver-virt, ovn-bgp-agent, the `openstack/` python
 libraries, and the per-image kernel-modules/initrd/squashfs steps. Everything else must come from
 cache.nixos.org. Measure with:
 

@@ -27,6 +27,8 @@ self: super: {
 
   nomad-driver-virt = self.callPackage ../../nomad { };
 
+  drbd-reactor = self.callPackage ../../drbd-reactor { };
+
   # HashiCorp's release binary. nixpkgs' nomad is BSL-licensed and therefore
   # never built by Hydra; building it from source costs a full Go build on
   # every nixpkgs bump.

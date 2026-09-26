@@ -35,6 +35,7 @@ in
     ../modules/prometheus-ganeti-exporter.nix
     ../modules/ovn-bgp-agent.nix
     ../modules/nomad.nix
+    ../modules/drbd-reactor.nix
   ];
 
   config =
@@ -147,6 +148,16 @@ in
         region = "homelab.tel";
         ovnNBConnection = "tcp:10.1.100.5:6641";
         nfsImageStore = "192.168.87.1:usb1-part2/disks";
+      };
+
+      # DRBD resource/connection/disk states and statistics for Prometheus.
+      services.drbd-reactor = {
+        enable = true;
+        drbdPackage = pkgs.drbd-utils-9;
+        prometheus = {
+          enable = true;
+          openFirewall = true;
+        };
       };
 
       services.prometheus.exporters.ganeti = {

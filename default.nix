@@ -23,6 +23,7 @@ in
     ovn-bgp-agent
     ganeti
     ganeti-os-pxe
+    drbd-reactor
     nomad-driver-virt
     nomad-bin
     prometheus-ganeti-exporter;
