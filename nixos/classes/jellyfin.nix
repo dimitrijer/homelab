@@ -32,6 +32,8 @@ in
     enable = true;
     domain = "jellyfin.homelab.tel";
     redirectDomains = [ "jellyfin" ];
+    # Jellyfin's HTTP port lives in its runtime network.xml, not in the NixOS
+    # module (which also hardcodes 8096 for openFirewall).
     upstreamPort = 8096;
   };
 }
