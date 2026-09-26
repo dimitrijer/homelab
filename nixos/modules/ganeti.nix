@@ -446,6 +446,9 @@ in
         "ganeti-luxid" = {
           description = "Ganeti query daemon (luxid)";
           documentation = [ "man:ganeti-luxid(8)" ];
+          # Job processes are spawned by luxid and inherit its environment;
+          # cluster verify runs `hcheck` (htools) from PATH for its N+1 check.
+          path = [ pkgs.ganeti ];
           requires = [ "ganeti-common.service" ];
           after = [ "ganeti-common.service" ];
           partOf = [ "ganeti-master.target" ];
