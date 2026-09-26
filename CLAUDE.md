@@ -42,7 +42,7 @@ The easiest way to build and deploy images is with `build-and-deploy.sh`:
 
 Available images: `adguard-home`, `audiobookshelf`, `calibre-web`, `ganeti-node`, `immich`, `jellyfin`, `metrics`, `navidrome`, `paperless`, `uptime-kuma` (the script discovers them from the `imageNames` attribute of `default.nix`).
 
-All requested images are built with a **single** `nix-build` (one evaluation, all builds scheduled together) via `mkDeployFarm`, producing `./result/<image>/bin/deploy`.
+Images are built and deployed one at a time (`nix-build -A <image>.deploy`). If one fails to build or deploy, the script moves on to the next and exits non-zero at the end with a list of the images that failed.
 
 For more control, use `nix-build` directly:
 

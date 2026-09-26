@@ -14,9 +14,9 @@
 #   ./build-and-deploy.sh ganeti-node          # Build and deploy single image
 #   ./build-and-deploy.sh jellyfin navidrome   # Build and deploy multiple images
 #
-# All requested images are built with a single nix-build invocation (one
-# evaluation; Nix schedules the builds of all images together), producing
-# ./result/<image>/bin/deploy for each of them.
+# Images are built and deployed one at a time. If an image fails to build or
+# deploy, the script moves on to the next one, and exits non-zero at the end
+# listing the images that failed.
 
 set -eu -o pipefail
 
@@ -38,15 +38,24 @@ else
     IMAGES=("${ALL_IMAGES[@]}")
 fi
 
-names=$(printf '"%s" ' "${IMAGES[@]}")
-
-echo "=== Building: ${IMAGES[*]}"
-nix-build -o result -E "(import ./. { }).mkDeployFarm [ $names ]"
-
+FAILED=()
 for image in "${IMAGES[@]}"; do
+    echo "=== Building $image..."
+    if ! deploy=$(nix-build --no-out-link -A "$image.deploy"); then
+        echo "=== Building $image failed, moving on" >&2
+        FAILED+=("$image (build)")
+        continue
+    fi
     echo "=== Deploying $image..."
-    "./result/$image/bin/deploy" ~/.ssh/id_ed25519
+    if ! "$deploy/bin/deploy" ~/.ssh/id_ed25519; then
+        echo "=== Deploying $image failed, moving on" >&2
+        FAILED+=("$image (deploy)")
+    fi
 done
 
 echo
+if [[ ${#FAILED[@]} -gt 0 ]]; then
+    echo "Failed: ${FAILED[*]}" >&2
+    exit 1
+fi
 echo "All done!"
