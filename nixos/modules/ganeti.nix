@@ -378,7 +378,11 @@ in
             description = "Ganeti virtualization cluster manager";
             documentation = [ "man:ganeti(7)" ];
             partOf = [ "ganeti.service" ];
-            wantedBy = lib.mkForce [ ]; # loaded on request
+            # Start the node and master daemons at boot, as upstream's
+            # ganeti.target does. Each daemon has a ConditionPathExists on its
+            # config/certificate, so on a node that is not part of a cluster
+            # yet only the ones that need no cluster state start.
+            wantedBy = [ "multi-user.target" ];
           };
           "ganeti-node" = {
             description = "Ganeti node functionality";
