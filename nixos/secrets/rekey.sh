@@ -18,6 +18,7 @@ INSTANCES=(
   adguard-home
   uptime-kuma
   immich
+  nix-cache
 )
 
 rm -rf ./keys

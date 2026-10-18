@@ -17,6 +17,8 @@ let
 
   immich = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCsbrXeRij0+Nt8leJ7vcaf/lEYVsJzh2mM6oQtMgEdoU/Q/Ap9Wdy6XkSulRK7ZRBK8kyPHTlAs6Kk0OaIoI2hg9ki4xPBxvLNx/TgEQq8djUJLvqMCwdUbJIbQE9d3QGzbccS/IVuC6d5nm7Anu3bdGq2Lu74Vd7S8TOm1urLBTWn6Lvt19/hV72OOBuFZBCMJR0iiS6SL6syTm0tthNeFOBwU4hDj+pK5Qi4XiEkPbxBz7dp6dgownXqcIYmvyFWv5gChemTug3HxGbk/m+19c/9G9Q18/QioCmFc2TeYMh+3+kiJ0pPBgySTD+YyG8unVKrNVf4qh2WnHmc+dUw5zu1V2DsngJuZ+vwzjyjx8QdGxB3sQY62LlQ4+nFHWhcrzkFBfxvXNOOsXgYIRbrbTZJ6HxD+fkyeHWYiunA2UlTCb7ylYV6rjFhtuub9sSR7k3q6qeTkNbS1fZgE2Ys2SfFC42FFxcys6hYqG1pepZ4TFZky+nJouH0M9XPnmc= root@immich";
 
+  nix-cache = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDk8Wu7E+Yo7NAJIeS9DAemYSt5tZqKyTIn9TshPLvMSaX8nGMa+3WMEHH+AlALzVO0+1Iqt28a0E/B7zmVNcI/kwXMsZw4+gM4QJ63mMWVtu480aUlfgulfP+DvFmlUN8yW+Bbo4OHGLKeAV+Cla3X4clcQyFFyierq0e8NbCchs2eeFh9HZwPVV5sQQfh/UJ91KnljuxvBh5HpAGENdYTlhEfmkTqvaY+8/s2cBtCMa6Sec393wjUKqBCeQIuywV5G9QH28jCvd2neIRsV2/ZkriLvCQNuavesGpiVTbGK/ostwiV5UM0MZUe0s2IFwMt13vHpZYSEJsYIcOaXNy9O97k2fAhXAvePyfiMG/tF0MW+rt5OPRAzuh7NVZZSquRLNQPFZg15SC9jcA36Ggh37aJqf47d44U1cRfTE8Zd1UKYFFNSa4o4TBHNxKWeJp8nplKf19NNOklFdTYqSFmfluIXek6qmHOoM6CFiU0Rk1NIIxMyhT4lto0RJ8O4Qs= root@nic-cache";
+
   needAcme = [
     navidrome
     calibre-web
@@ -27,9 +29,11 @@ let
     adguard-home
     uptime-kuma
     immich
+    nix-cache
   ];
 in
 {
   "namecheap.ini.age".publicKeys = needAcme;
   "paperless-admin-password.age".publicKeys = [ paperless ];
+  "atticd-env.age".publicKeys = [ nix-cache ];
 }

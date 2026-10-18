@@ -73,6 +73,7 @@ in
             locations."/" = {
               proxyPass = "http://${cfg.upstreamAddress}:${toString cfg.upstreamPort}";
               proxyWebsockets = true;
+              extraConfig = cfg.extraConfig;
             };
           };
         } // redirectVirtualHosts;
