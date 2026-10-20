@@ -40,7 +40,7 @@ The easiest way to build and deploy images is with `build-and-deploy.sh`:
 ./build-and-deploy.sh jellyfin navidrome
 ```
 
-Available images: `adguard-home`, `audiobookshelf`, `calibre-web`, `ganeti-node`, `immich`, `jellyfin`, `metrics`, `navidrome`, `paperless`, `uptime-kuma` (the script discovers them from the `imageNames` attribute of `default.nix`).
+Available images: `adguard-home`, `audiobookshelf`, `calibre-web`, `ganeti-node`, `immich`, `jellyfin`, `metrics`, `navidrome`, `nix-builder`, `nix-cache`, `paperless`, `uptime-kuma` (the script discovers them from the `imageNames` attribute of `default.nix`).
 
 Images are built and deployed one at a time (`nix-build -A <image>.deploy`). If one fails to build or deploy, the script moves on to the next and exits non-zero at the end with a list of the images that failed.
 
@@ -223,6 +223,8 @@ self: super: {
 │   │   ├── jellyfin.nix
 │   │   ├── metrics.nix       # Prometheus/Grafana monitoring
 │   │   ├── navidrome.nix
+│   │   ├── nix-cache.nix     # Attic binary cache (nix-cache.homelab.tel)
+│   │   ├── nix-builder.nix   # Stateless remote Nix builder (nix-builder1, 2, ...)
 │   │   ├── paperless.nix
 │   │   └── uptime-kuma.nix
 │   ├── modules/               # Reusable NixOS modules
@@ -606,6 +608,27 @@ Set instance memory in Ganeti with:
 ```bash
 gnt-instance modify -B minmem=2g,maxmem=2g <instance>
 ```
+
+## Nix Binary Cache and Remote Builders
+
+- **`nix-cache`** (one VM): Attic at `https://nix-cache.homelab.tel`, cache
+  name `homelab`. SQLite + chunk storage in `/var/lib/atticd` on the var LV.
+  Attic skips paths already on cache.nixos.org, so it only stores custom
+  builds; paths not pulled for 3 months are GC'd. The JWT signing secret is
+  `nixos/secrets/atticd-env.age` (`ATTIC_SERVER_TOKEN_RS256_SECRET_BASE64=...`).
+- **`nix-builder`** (one image, fungible instances `nix-builder1`,
+  `nix-builder2`, ...; DRBD like every other VM): stateless `ssh-ng`
+  builders, user `nixbuild`. `netboot-http.rwStoreOnDisk` puts the store's
+  overlay upper layer on `/var/lib/netboot-rw-store` (wiped every boot)
+  instead of tmpfs, and `build-dir` is `/var/lib/nix-build`. Builders do not
+  push to the cache: outputs are copied back to the client, whose
+  `post-build-hook` pushes them.
+- Client keys (`clientKeys`) and the cache public key (`cachePublicKey`) are
+  set at the top of `nixos/classes/nix-builder.nix`.
+- Non-NixOS workstations: `sudo ./setup-nix-cache-client.sh [TOKEN_FILE]`
+  adds the cache as a substituter and, given a push token, installs a
+  `post-build-hook` that pushes builds (minus squashfs/initrd/netbuild/system
+  toplevels) to the cache. Idempotent.
 
 ## Secrets Management
 

@@ -149,6 +149,10 @@ in
     className = "adguard-home";
     modules = [ ./classes/adguard-home.nix ];
   };
+  nix-builder = mkNetbuild {
+    className = "nix-builder";
+    modules = [ ./classes/nix-builder.nix ];
+  };
   nix-cache = mkNetbuild {
     className = "nix-cache";
     modules = [ ./classes/nix-cache.nix ];

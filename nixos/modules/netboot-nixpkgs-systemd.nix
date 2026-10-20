@@ -4,6 +4,7 @@ with lib;
 
 let
   cfg = config.netboot-http;
+  rwStoreDiskPath = "/var/lib/netboot-rw-store";
 in
 {
   options.netboot-http = {
@@ -48,6 +49,19 @@ in
       };
     };
 
+    rwStoreOnDisk = mkOption {
+      type = types.bool;
+      default = false;
+      description = ''
+        Put the writable upper layer of the /nix/store overlay on the var LV
+        (under /var/lib/netboot-rw-store) instead of tmpfs, so that build
+        outputs and substituted paths do not consume RAM. The layer is started
+        afresh on every boot, matching the Nix database on the root tmpfs.
+        Falls back to tmpfs when the var LV does not exist yet (first boot) or
+        when disks are being provisioned.
+      '';
+    };
+
     hashUrl = mkOption {
       type = types.str;
       default = "";
@@ -71,6 +85,11 @@ in
   };
 
   config = mkIf cfg.enable {
+    assertions = [{
+      assertion = cfg.rwStoreOnDisk -> cfg.cache.enable;
+      message = "netboot-http.rwStoreOnDisk requires netboot-http.cache.enable (it uses the same var LV)";
+    }];
+
     # Build the squashfs store image
     system.build.squashfsStore = pkgs.callPackage (modulesPath + "/../lib/make-squashfs.nix") {
       storeContents = cfg.storeContents;
@@ -301,12 +320,28 @@ in
         fi
 
         # Create overlay for writable store
-        echo "Setting up overlay at /sysroot/nix/store"
-        mount -t tmpfs tmpfs /sysroot/nix/.rw-store
-        mkdir -p /sysroot/nix/.rw-store/store /sysroot/nix/.rw-store/work
+        RW_DIR=/sysroot/nix/.rw-store
+        ${optionalString cfg.rwStoreOnDisk ''
+          if [ "$CACHE_AVAILABLE" = "true" ] && [[ " $(cat /proc/cmdline) " != *" homelab.provision_disks=true "* ]]; then
+            RW_DIR=/sysroot${rwStoreDiskPath}
+            # The Nix database lives on the root tmpfs, so the previous
+            # boot's layer is unregistered garbage. Move it aside for
+            # netboot-rw-store-cleanup.service rather than deleting it here,
+            # which could take a while and delay the boot.
+            if [ -e "$RW_DIR" ]; then
+              mv "$RW_DIR" "$RW_DIR.old.$(date +%s)"
+            fi
+            echo "Using disk-backed writable store at $RW_DIR"
+          fi
+        ''}
+        if [ "$RW_DIR" = /sysroot/nix/.rw-store ]; then
+          mount -t tmpfs tmpfs /sysroot/nix/.rw-store
+        fi
+        mkdir -p "$RW_DIR/store" "$RW_DIR/work"
 
+        echo "Setting up overlay at /sysroot/nix/store"
         if ! mount -t overlay overlay \
-          -o lowerdir=/sysroot/nix/.ro-store,upperdir=/sysroot/nix/.rw-store/store,workdir=/sysroot/nix/.rw-store/work \
+          -o lowerdir=/sysroot/nix/.ro-store,upperdir=$RW_DIR/store,workdir=$RW_DIR/work \
           /sysroot/nix/store; then
           echo "ERROR: Failed to mount overlay"
           exit 1
@@ -338,6 +373,21 @@ in
       };
       script = ''
         ${pkgs.nix}/bin/nix-store --load-db < /nix/store/nix-path-registration
+      '';
+    };
+
+    # Remove writable store layers left behind by previous boots.
+    systemd.services.netboot-rw-store-cleanup = mkIf cfg.rwStoreOnDisk {
+      description = "Remove stale disk-backed netboot store layers";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "local-fs.target" ];
+      serviceConfig = {
+        Type = "oneshot";
+        Nice = 19;
+        IOSchedulingClass = "idle";
+      };
+      script = ''
+        rm -rf ${rwStoreDiskPath}.old.*
       '';
     };
   };
